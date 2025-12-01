@@ -6,22 +6,26 @@ from scipy.io import savemat
 from scipy.signal.windows import hann
 
 
-def generate_bright_point(seed,max_point):
-    np.random.seed(seed)
-    nb_point = round(np.random.rand()*10 % max_point) 
-    bright_points = np.zeros((nb_point,3))
-    for nb in range(nb_point):
-        bright_points[nb] = np.array(np.random.rand(3))
-        bright_points[nb][0] = bright_points[nb][0]*10e-3 
-        bright_points[nb][1] = bright_points[nb][1]*10e-3 + 10e-3
-        bright_points[nb][2] = bright_points[nb][2]*10%4
+def generate_bright_point(seed,
+                          max_point,
+                          x_range=(-10e-3, 10e-3),
+                          z_range=(10e-3, 50e-3),
+                          amp_range=(1.0, 3.0)):
+
+    rng = np.random.default_rng(seed)
+    nb_points = round(np.random.rand()*9 % max_point)+1
+    bright_points = np.zeros((nb_points,3))
+    for nb in range(nb_points):
+        bright_points[nb][0] = rng.uniform(x_range[0], x_range[1])
+        bright_points[nb][1] = rng.uniform(z_range[0], z_range[1])
+        bright_points[nb][2] = round(rng.uniform(amp_range[0], amp_range[1]) )
     print(bright_points)
     return bright_points
         
 
 def simulate_us_scene(
     N_speckle=0,
-    SNR_dB=40.0,
+    SNR_dB=10.0,
     seed=None,
     save_mat_path=None,
     save_png_path=None,
@@ -38,7 +42,8 @@ def simulate_us_scene(
     # Graine aléatoire
     # ============================
     if seed is not None:
-        np.random.seed(seed)
+        print(seed)
+        #np.random.seed(seed)
 
     # ============================
     # Paramètres de base
@@ -287,7 +292,7 @@ if __name__ == "__main__":
 
         simulate_us_scene(
             N_speckle=0,        
-            SNR_dB=+40.0,
+            SNR_dB=+15.0,
             seed=i,               
             save_mat_path=mat_path,
             save_png_path=png_path,
