@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 from scipy.signal import hilbert
 from scipy.io import savemat
 from scipy.signal.windows import hann
+import argparse
+import os
 
 
 def generate_bright_point(
@@ -298,19 +300,44 @@ def save_h5(path, data):
     print(f"[OK] Saved HDF5 → {path}")
 
 # ============================
-# Exemple : générer 10 scènes
+# Main Loop avec Arguments
 # ============================
 if __name__ == "__main__":
-    for i in range(10):
-        h5_path = f"data/h5/sample_{i:03d}.h5"
-        png_path = f"data/images/bmode_{i:03d}.png"
+    # 1. Configuration des arguments
+    parser = argparse.ArgumentParser(description="Simulateur Echographique B-Mode")
+    parser.add_argument("--num", type=int, default=10, help="Nombre d'images à générer")
+    parser.add_argument("--out", type=str, default="data", help="Dossier de sortie racine")
+    parser.add_argument("--show", action="store_true", help="Afficher les plots (bloquant)")
+
+    args = parser.parse_args()
+
+    # 2. Création des dossiers de sortie
+    h5_dir = os.path.join(args.out, "h5")
+    img_dir = os.path.join(args.out, "images")
+
+    os.makedirs(h5_dir, exist_ok=True)
+    os.makedirs(img_dir, exist_ok=True)
+
+    print(f"--- Démarrage de la simulation ---")
+    print(f"Nombre d'images : {args.num}")
+    print(f"Dossier sortie  : {args.out}")
+
+    # 3. Boucle de génération
+    for i in range(args.num):
+        filename_base = f"sample_{i:04d}" # ex: sample_0001
+
+        h5_path = os.path.join(h5_dir, f"{filename_base}.h5")
+        png_path = os.path.join(img_dir, f"{filename_base}.png")
+
+        print(f"[{i+1}/{args.num}] Génération seed={i}...", end="\r")
 
         simulate_us_scene(
-            N_speckle=0,        
-            SNR_dB=+15.0,
-            seed=i,               
+            N_speckle=0,
+            SNR_dB=15.0, # Un peu plus propre
+            seed=i,
             save_path=h5_path,
             save_png_path=png_path,
-            plot=False,           
+            plot=args.show,
         )
 
+    print("\n--- Terminé ! ---")
