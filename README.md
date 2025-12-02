@@ -17,3 +17,15 @@ Assurez-vous d'avoir Python installé (3.8+ recommandé). Installez les dépenda
 
 ```bash
 pip install numpy scipy matplotlib h5py
+
+## 🚀 Utilisation en Ligne de Commande
+
+Le script main.py s'utilise avec des arguments pour configurer la génération des données.
+
+### Options de Configuration
+
+Vous pouvez personnaliser l'exécution avec les arguments suivants :
+
+* **`--num`** (Type int, Défaut: 10) : Définit le nombre d'images (scènes) à simuler et à enregistrer.
+* **`--out`** (Type str, Défaut: data) : Définit le dossier racine de sortie. Le script crée automatiquement les sous-dossiers /h5 (pour les données brutes) et /images (pour les PNG) à l'intérieur.
+* **`--show`** (Type flag, Défaut: False) : Active l'affichage des fenêtres graphiques matplotlib pendant la génération. Note : Ceci est un mode interactif et bloquant.
