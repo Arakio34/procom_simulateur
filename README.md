@@ -11,14 +11,23 @@ Le simulateur modélise une émission en **Onde Plane (Plane Wave)** et inclut l
 - **Export de Données :** Sauvegarde des données brutes (RF) et traitées (Enveloppe, B-mode) au format `.h5` (HDF5).
 - **Visualisation :** Génération automatique des images `.png`.
 
-## ⚙️ Installation
+## ⚙️ Installation des Dépendances
 
-Assurez-vous d'avoir Python installé (3.8+ recommandé). Installez les dépendances nécessaires :
+Pour garantir un environnement propre et reproductible, suivez ces étapes :
+
+### 1. Création et Activation de l'Environnement Virtuel (Recommandé)
+
+Il est fortement recommandé d'utiliser un environnement virtuel (`venv`) pour isoler les dépendances de votre projet :
 
 ```bash
-pip install numpy scipy matplotlib h5py
-```
+# Crée l'environnement (nommé 'venv')
+python -m venv venv 
 
+# Active l'environnement (Linux/macOS)
+source venv/bin/activate
+
+pip install -r requirements.txt
+```
 
 ## 🚀 Utilisation en Ligne de Commande
 
