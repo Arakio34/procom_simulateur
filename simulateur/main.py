@@ -6,11 +6,13 @@ from scipy.io import savemat
 from scipy.signal.windows import hann
 
 
-def generate_bright_point(seed,
-                          max_point,
-                          x_range=(-10e-3, 10e-3),
-                          z_range=(10e-3, 50e-3),
-                          amp_range=(1.0, 3.0)):
+def generate_bright_point(
+    seed,
+    max_point,
+    x_range=(-10e-3, 10e-3), 
+    z_range=(10e-3, 50e-3),
+    amp_range=(1.0, 3.0)
+):
 
     rng = np.random.default_rng(seed)
     nb_points = round(np.random.rand()*9 % max_point)+1
@@ -27,7 +29,7 @@ def simulate_us_scene(
     N_speckle=0,
     SNR_dB=10.0,
     seed=None,
-    save_mat_path=None,
+    save_path=None,
     save_png_path=None,
     plot=False,
     max_point=3,
@@ -58,8 +60,8 @@ def simulate_us_scene(
     # ============================
     # Array
     # ============================
-    Nelem    = 80
-    pitch    = 0.3e-3
+    Nelem    = 256
+    pitch    = 0.15e-3
     aperture = (Nelem - 1) * pitch
     x_el     = np.linspace(-aperture / 2, aperture / 2, Nelem)
     z_el     = 0.0  # non utilisé ensuite
@@ -163,7 +165,7 @@ def simulate_us_scene(
     # ============================
     # Beamforming DAS
     # ============================
-    Xg, Zg = np.meshgrid(x_img, z_img, indexing='xy')  # pas vraiment utilisé
+    Xg, Zg = np.meshgrid(x_img, z_img, indexing='xy')  
 
     bmode_lin = np.zeros((Nz, Nx), dtype=np.float32)
     y_align   = np.zeros((Nelem, Nx, Nz), dtype=np.float32)
@@ -184,9 +186,22 @@ def simulate_us_scene(
         bmode_lin[:, ix] = y_sum.astype(np.float32)
 
     # ============================
-    # Enveloppe + log-compression
+    # Enveloppe + log-compression 
     # ============================
-    analytic = hilbert(bmode_lin, axis=0)
+
+    # 1. On définit une taille de padding (ex: 64 pixels de marge)
+    pad_width = 64
+
+    # 2. On ajoute des zéros en haut et en bas de l'axe 0 (profondeur z)
+    # bmode_lin est de forme (Nz, Nx)
+    bmode_padded = np.pad(bmode_lin, ((pad_width, pad_width), (0, 0)), mode='constant')
+
+    # 3. On applique Hilbert sur la version allongée
+    analytic_padded = hilbert(bmode_padded, axis=0)
+
+    # 4. On retire le padding pour retrouver la taille originale (Nz, Nx)
+    analytic = analytic_padded[pad_width:-pad_width, :]
+
     env      = np.abs(analytic)
     env_max  = np.max(env + eps)
     env      = env / env_max
@@ -255,9 +270,9 @@ def simulate_us_scene(
         'meta': meta,
     }
 
-    if save_mat_path is not None:
-        save_h5(save_mat_path, data)
-        print(f'Saved: {save_mat_path}')
+    if save_path is not None:
+        save_h5(save_path, data)
+        print(f'Saved: {save_path}')
 
     return data
 
@@ -287,14 +302,14 @@ def save_h5(path, data):
 # ============================
 if __name__ == "__main__":
     for i in range(10):
-        mat_path = f"data/h5/sample_{i:03d}.h5"
+        h5_path = f"data/h5/sample_{i:03d}.h5"
         png_path = f"data/images/bmode_{i:03d}.png"
 
         simulate_us_scene(
             N_speckle=0,        
             SNR_dB=+15.0,
             seed=i,               
-            save_mat_path=mat_path,
+            save_path=h5_path,
             save_png_path=png_path,
             plot=False,           
         )
