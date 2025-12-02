@@ -23,7 +23,6 @@ def generate_bright_point(
         bright_points[nb][0] = rng.uniform(x_range[0], x_range[1])
         bright_points[nb][1] = rng.uniform(z_range[0], z_range[1])
         bright_points[nb][2] = round(rng.uniform(amp_range[0], amp_range[1]) )
-    print(bright_points)
     return bright_points
         
 
@@ -46,8 +45,7 @@ def simulate_us_scene(
     # Graine aléatoire
     # ============================
     if seed is not None:
-        print(seed)
-        #np.random.seed(seed)
+        np.random.seed(seed)
 
     # ============================
     # Paramètres de base
@@ -299,45 +297,44 @@ def save_h5(path, data):
 
     print(f"[OK] Saved HDF5 → {path}")
 
-# ============================
-# Main Loop avec Arguments
-# ============================
 if __name__ == "__main__":
-    # 1. Configuration des arguments
     parser = argparse.ArgumentParser(description="Simulateur Echographique B-Mode")
+    
+    # Arguments demandés précédemment
     parser.add_argument("--num", type=int, default=10, help="Nombre d'images à générer")
     parser.add_argument("--out", type=str, default="data", help="Dossier de sortie racine")
     parser.add_argument("--show", action="store_true", help="Afficher les plots (bloquant)")
-
+    parser.add_argument("--speckle", type=int, default=0, help="Nombre de points de speckle (bruit de fond aléatoire). Mettre 0 pour n'avoir que les points brillants.")
+    parser.add_argument("--snr", type=float, default=15.0, help="Rapport Signal/Bruit désiré en dB.")
+    
     args = parser.parse_args()
 
-    # 2. Création des dossiers de sortie
     h5_dir = os.path.join(args.out, "h5")
     img_dir = os.path.join(args.out, "images")
-
+    
     os.makedirs(h5_dir, exist_ok=True)
     os.makedirs(img_dir, exist_ok=True)
 
     print(f"--- Démarrage de la simulation ---")
     print(f"Nombre d'images : {args.num}")
+    print(f"Points de Speckle : {args.speckle}")
+    print(f"SNR (dB) : {args.snr}")
     print(f"Dossier sortie  : {args.out}")
 
-    # 3. Boucle de génération
     for i in range(args.num):
-        filename_base = f"sample_{i:04d}" # ex: sample_0001
-
+        filename_base = f"sample_{i:04d}" 
+        
         h5_path = os.path.join(h5_dir, f"{filename_base}.h5")
         png_path = os.path.join(img_dir, f"{filename_base}.png")
 
-        print(f"[{i+1}/{args.num}] Génération seed={i}...", end="\r")
-
+        
         simulate_us_scene(
-            N_speckle=0,
-            SNR_dB=15.0, # Un peu plus propre
-            seed=i,
+            N_speckle=args.speckle,  
+            SNR_dB=args.snr,         
+            seed=i,               
             save_path=h5_path,
             save_png_path=png_path,
-            plot=args.show,
+            plot=args.show,           
         )
-
-    print("\n--- Terminé ! ---")
+    
+    print("\n--- Terminé ! ---")# ============================
