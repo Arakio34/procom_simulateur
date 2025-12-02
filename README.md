@@ -29,3 +29,5 @@ Vous pouvez personnaliser l'exécution avec les arguments suivants :
 * **`--num`** (Type int, Défaut: 10) : Définit le nombre d'images (scènes) à simuler et à enregistrer.
 * **`--out`** (Type str, Défaut: data) : Définit le dossier racine de sortie. Le script crée automatiquement les sous-dossiers /h5 (pour les données brutes) et /images (pour les PNG) à l'intérieur.
 * **`--show`** (Type flag, Défaut: False) : Active l'affichage des fenêtres graphiques matplotlib pendant la génération. Note : Ceci est un mode interactif et bloquant.
+* **`--speckle`** (Type int, Défaut: 0) : Définit le nombre de points de speckle (diffuseurs aléatoires) dans le volume. Mettre 0 pour n'avoir que les points brillants.
+* **`--snr`** (Type float, Défaut: 15.0) : Définit le Rapport Signal/Bruit (SNR) désiré, exprimé en décibels (dB).
