@@ -29,6 +29,7 @@ def generate_bright_point(
 def simulate_us_scene(
     N_speckle=0,
     SNR_dB=10.0,
+    Nelem=80,
     seed=None,
     save_path=None,
     save_png_path=None,
@@ -60,7 +61,6 @@ def simulate_us_scene(
     # ============================
     # Array
     # ============================
-    Nelem    = 256
     pitch    = 0.15e-3
     aperture = (Nelem - 1) * pitch
     x_el     = np.linspace(-aperture / 2, aperture / 2, Nelem)
@@ -306,6 +306,7 @@ if __name__ == "__main__":
     parser.add_argument("--show", action="store_true", help="Afficher les plots (bloquant)")
     parser.add_argument("--speckle", type=int, default=0, help="Nombre de points de speckle (bruit de fond aléatoire). Mettre 0 pour n'avoir que les points brillants.")
     parser.add_argument("--snr", type=float, default=15.0, help="Rapport Signal/Bruit désiré en dB.")
+    parser.add_argument("--nelem", type=int, default=80, help="Nombre de capteur.")
     
     args = parser.parse_args()
 
@@ -331,6 +332,7 @@ if __name__ == "__main__":
         simulate_us_scene(
             N_speckle=args.speckle,  
             SNR_dB=args.snr,         
+            Nelem=args.nelem,         
             seed=i,               
             save_path=h5_path,
             save_png_path=png_path,
