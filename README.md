@@ -17,6 +17,8 @@ Assurez-vous d'avoir Python installé (3.8+ recommandé). Installez les dépenda
 
 ```bash
 pip install numpy scipy matplotlib h5py
+```
+
 
 ## 🚀 Utilisation en Ligne de Commande
 
