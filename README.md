@@ -42,3 +42,4 @@ Vous pouvez personnaliser l'exécution avec les arguments suivants :
 * **`--show`** (Type flag, Défaut: False) : Active l'affichage des fenêtres graphiques matplotlib pendant la génération. Note : Ceci est un mode interactif et bloquant.
 * **`--speckle`** (Type int, Défaut: 0) : Définit le nombre de points de speckle (diffuseurs aléatoires) dans le volume. Mettre 0 pour n'avoir que les points brillants.
 * **`--snr`** (Type float, Défaut: 15.0) : Définit le Rapport Signal/Bruit (SNR) désiré, exprimé en décibels (dB).
+* **`--nelem`** (Type int, Défaut: 80) : Définit le nombre de capteur simuler.
