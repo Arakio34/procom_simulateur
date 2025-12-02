@@ -287,8 +287,8 @@ def save_h5(path, data):
 # ============================
 if __name__ == "__main__":
     for i in range(10):
-        mat_path = f"sample_{i:03d}.h5"
-        png_path = f"bmode_{i:03d}.png"
+        mat_path = f"data/h5/sample_{i:03d}.h5"
+        png_path = f"data/images/bmode_{i:03d}.png"
 
         simulate_us_scene(
             N_speckle=0,        
