@@ -360,11 +360,12 @@ if __name__ == "__main__":
             save_png_path=png_path,
         )
 
-        data = beamforming( rf, 
-                            save_path=h5_path,
-                            save_png_path=png_path,
-                            SNR_dB=args.snr,         
-                           )
+        data = beamforming( 
+            rf, 
+            save_path=h5_path,
+            save_png_path=png_path,
+            SNR_dB=args.snr,         
+        )
 
         if h5_path is not None:
             save_h5(h5_path, data)
