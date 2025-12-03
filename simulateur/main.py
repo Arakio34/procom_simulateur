@@ -32,7 +32,6 @@ def simulate_us_scene(
     seed=None,
     save_path=None,
     save_png_path=None,
-    plot=False,
     max_point=3,
 ):
     """
@@ -40,6 +39,14 @@ def simulate_us_scene(
 
     Retourne un dict avec rf, bmode_dB, env, meta, etc.
     """
+
+    x_span   = 20e-3
+    z_min    = 10e-3
+    z_max    = 50e-3
+    Nx       = 256
+    Nz       = 256
+    x_img    = np.linspace(-x_span / 2, x_span / 2, Nx)
+    z_img    = np.linspace(z_min, z_max, Nz)
 
     # ============================
     # Graine aléatoire
@@ -55,7 +62,7 @@ def simulate_us_scene(
     fracBW   = 0.6
     fs       = 40e6
     lam      = c / f0
-    dt       = 1.0 / fs  # pas vraiment utilisé mais bon
+    dt       = 1.0 / fs  
 
     # ============================
     # Array
@@ -63,18 +70,7 @@ def simulate_us_scene(
     pitch    = 0.15e-3
     aperture = (Nelem - 1) * pitch
     x_el     = np.linspace(-aperture / 2, aperture / 2, Nelem)
-    z_el     = 0.0  # non utilisé ensuite
 
-    # ============================
-    # Grille image
-    # ============================
-    x_span   = 20e-3
-    z_min    = 10e-3
-    z_max    = 50e-3
-    Nx       = 256
-    Nz       = 256
-    x_img    = np.linspace(-x_span / 2, x_span / 2, Nx)
-    z_img    = np.linspace(z_min, z_max, Nz)
 
     # ============================
     # Phantom
@@ -119,9 +115,9 @@ def simulate_us_scene(
 
     bright_points = generate_bright_point(seed,max_point)
 
-    xs = np.concatenate([xs, bright_points[:, 0]])
-    zs = np.concatenate([zs, bright_points[:, 1]])
-    as_ = np.concatenate([as_, bright_points[:, 2]])
+    xs = bright_points[:, 0]
+    zs = bright_points[:, 1]
+    as_ = bright_points[:, 2]
 
     N_scatt = as_.size
 
@@ -155,15 +151,64 @@ def simulate_us_scene(
     signal_pow = np.mean(rf.astype(np.float64) ** 2 + eps)
     noise_pow  = signal_pow / (10 ** (SNR_dB / 10))
     rf = rf + np.sqrt(noise_pow).astype(np.float32) * np.random.randn(*rf.shape).astype(np.float32)
+    return rf
 
-    # ============================
-    # Beamforming DAS
-    # ============================
+def beamforming(
+    rf,
+    Nelem=80,
+    save_path=None,
+    save_png_path=None,
+    SNR_dB=10.0,
+    plot=False,):
+
+
+
+    c        = 1540.0
+    f0       = 5e6
+    fracBW   = 0.6
+    fs       = 40e6
+    lam      = c / f0
+    dt       = 1.0 / fs  
+
+    x_span   = 20e-3
+    z_min    = 10e-3
+    z_max    = 50e-3
+    Nx       = 256
+    Nz       = 256
+    x_img    = np.linspace(-x_span / 2, x_span / 2, Nx)
+    z_img    = np.linspace(z_min, z_max, Nz)
+
     Xg, Zg = np.meshgrid(x_img, z_img, indexing='xy')  
 
     bmode_lin = np.zeros((Nz, Nx), dtype=np.float32)
     y_align   = np.zeros((Nelem, Nx, Nz), dtype=np.float32)
 
+    pitch    = 0.15e-3
+    aperture = (Nelem - 1) * pitch
+    x_el     = np.linspace(-aperture / 2, aperture / 2, Nelem)
+
+    z_max_toa = z_max / c
+    r_max     = np.sqrt((x_span / 2 + aperture / 2) ** 2 + z_max ** 2)
+    t_max     = z_max_toa + r_max / c + 2 / f0
+    t         = np.arange(0.0, t_max + 1.0 / fs, 1.0 / fs)
+    Nt        = t.size
+
+    use_hann = 1
+    if use_hann == 1:
+        apo_rx = hann(Nelem)
+    else:
+        apo_rx = np.ones(Nelem)
+
+    eps = np.finfo(np.float32).eps
+
+    # ============================
+    # Pulse
+    # ============================
+    nCycles = 2.5
+    pulseT  = nCycles / f0
+    t_pulse = np.arange(-pulseT, pulseT + 1.0 / fs, 1.0 / fs)
+    sigma_t = pulseT / 2.355
+    pulse   = np.cos(2 * np.pi * f0 * t_pulse) * np.exp(-(t_pulse ** 2) / (2 * sigma_t ** 2))
     for ix in range(Nx):
         x0 = x_img[ix]
         zz = z_img
@@ -241,15 +286,6 @@ def simulate_us_scene(
         'SNR_dB': SNR_dB,
         'nCycles': nCycles,
         'fracBW': fracBW,
-        'phantom': {
-            'xs': xs,
-            'zs': zs,
-            'as': as_,
-            'bright_point': {
-                'pos': pt_pos,
-                'amp': pt_amp
-            }
-        }
     }
 
     data = {
@@ -263,11 +299,6 @@ def simulate_us_scene(
         'y_align': y_align,
         'meta': meta,
     }
-
-    if save_path is not None:
-        save_h5(save_path, data)
-        print(f'Saved: {save_path}')
-
     return data
 
 
@@ -321,13 +352,22 @@ if __name__ == "__main__":
         png_path = os.path.join(img_dir, f"{filename_base}.png")
 
         
-        simulate_us_scene(
+        rf = simulate_us_scene(
             SNR_dB=args.snr,         
             Nelem=args.nelem,         
             seed=i,               
             save_path=h5_path,
             save_png_path=png_path,
-            plot=args.show,           
         )
+
+        data = beamforming( rf, 
+                            save_path=h5_path,
+                            save_png_path=png_path,
+                            SNR_dB=args.snr,         
+                           )
+
+        if h5_path is not None:
+            save_h5(h5_path, data)
+            print(f'Saved: {h5_path}')
     
     print("\n--- Terminé ! ---")# ============================
