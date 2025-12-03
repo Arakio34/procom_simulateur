@@ -27,7 +27,6 @@ def generate_bright_point(
         
 
 def simulate_us_scene(
-    N_speckle=0,
     SNR_dB=10.0,
     Nelem=80,
     seed=None,
@@ -115,13 +114,8 @@ def simulate_us_scene(
         apo_rx = np.ones(Nelem)
 
     # ============================
-    # Speckle + points brillants
+    #  Points brillants
     # ============================
-    xs = ROI_x[0] + (ROI_x[1] - ROI_x[0]) * np.random.rand(N_speckle)
-    zs = ROI_z[0] + (ROI_z[1] - ROI_z[0]) * np.random.rand(N_speckle)
-    as_ = rayleighScale * np.abs(
-        (np.random.randn(N_speckle) + 1j * np.random.randn(N_speckle)) / np.sqrt(2.0)
-    )
 
     bright_points = generate_bright_point(seed,max_point)
 
@@ -304,7 +298,6 @@ if __name__ == "__main__":
     parser.add_argument("--num", type=int, default=10, help="Nombre d'images à générer")
     parser.add_argument("--out", type=str, default="data", help="Dossier de sortie racine")
     parser.add_argument("--show", action="store_true", help="Afficher les plots (bloquant)")
-    parser.add_argument("--speckle", type=int, default=0, help="Nombre de points de speckle (bruit de fond aléatoire). Mettre 0 pour n'avoir que les points brillants.")
     parser.add_argument("--snr", type=float, default=15.0, help="Rapport Signal/Bruit désiré en dB.")
     parser.add_argument("--nelem", type=int, default=80, help="Nombre de capteur.")
     
@@ -318,7 +311,6 @@ if __name__ == "__main__":
 
     print(f"--- Démarrage de la simulation ---")
     print(f"Nombre d'images : {args.num}")
-    print(f"Points de Speckle : {args.speckle}")
     print(f"SNR (dB) : {args.snr}")
     print(f"Dossier sortie  : {args.out}")
 
@@ -330,7 +322,6 @@ if __name__ == "__main__":
 
         
         simulate_us_scene(
-            N_speckle=args.speckle,  
             SNR_dB=args.snr,         
             Nelem=args.nelem,         
             seed=i,               
