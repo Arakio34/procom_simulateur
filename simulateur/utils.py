@@ -8,32 +8,26 @@ from scipy.signal.windows import hann
 import argparse
 import os
 
-def affichage(bmode_dB, 
-              save_png_path=None,):
+def save_image(save_png_path,data):
     # ============================
     # Affichage / sauvegarde PNG
     # ============================
-    if plot or (save_png_path is not None):
-        plt.figure()
-        plt.imshow(
-            bmode_dB,
-            extent=[x_img[0] * 1e3, x_img[-1] * 1e3, z_img[-1] * 1e3, z_img[0] * 1e3],
-            cmap='gray',
-            aspect='equal'
-        )
-        plt.clim(-60, 0)
-        plt.xlabel('x [mm]')
-        plt.ylabel('z [mm]')
-        plt.title('B-mode (DAS, dB)')
-        plt.colorbar(label='dB')
+    plt.figure()
+    plt.imshow(
+        data["bmode_dB"],
+        extent=[data["x_img"][0] * 1e3, data["x_img"][-1] * 1e3, data["z_img"][-1] * 1e3, data["z_img"][0] * 1e3],
+        cmap='gray',
+        aspect='equal'
+    )
+    plt.clim(-60, 0)
+    plt.xlabel('x [mm]')
+    plt.ylabel('z [mm]')
+    plt.title('B-mode (DAS, dB)')
+    plt.colorbar(label='dB')
 
-        if save_png_path is not None:
-            plt.savefig(save_png_path, dpi=300, bbox_inches='tight')
+    plt.savefig(save_png_path, dpi=300, bbox_inches='tight')
 
-        if plot:
-            plt.show()
-        else:
-            plt.close()
+    plt.close()
 
 
 def save_h5(path, data):
