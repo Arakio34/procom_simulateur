@@ -30,8 +30,6 @@ def simulate_us_scene(
     SNR_dB=10.0,
     Nelem=80,
     seed=None,
-    save_path=None,
-    save_png_path=None,
     max_point=3,
 ):
     """
