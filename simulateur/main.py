@@ -7,13 +7,9 @@ from scipy.io import savemat
 from scipy.signal.windows import hann
 import argparse
 import os
-from utils import save_h5
+from utils import save_h5, save_image
 from simulateur import simulate_us_scene
-from beamforming import beamforming
-
-
-
-
+from beamforming import beamforming, mvdr_beamforming
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Simulateur Echographique B-Mode")
@@ -24,6 +20,8 @@ if __name__ == "__main__":
     parser.add_argument("--show", action="store_true", help="Afficher les plots (bloquant)")
     parser.add_argument("--snr", type=float, default=15.0, help="Rapport Signal/Bruit désiré en dB.")
     parser.add_argument("--nelem", type=int, default=80, help="Nombre de capteur.")
+    parser.add_argument("--mvdr", type=bool, default=False, help="Activation du MVDR.")
+    parser.add_argument("--maxpoint", type=int, default=3, help="Nombre de point maximum par image.")
     
     args = parser.parse_args()
 
@@ -42,25 +40,33 @@ if __name__ == "__main__":
         filename_base = f"sample_{i:04d}" 
         
         h5_path = os.path.join(h5_dir, f"{filename_base}.h5")
-        png_path = os.path.join(img_dir, f"{filename_base}.png")
 
         
         rf = simulate_us_scene(
             SNR_dB=args.snr,         
             Nelem=args.nelem,         
             seed=i,               
-            save_path=h5_path,
-            save_png_path=png_path,
+            max_point=args.maxpoint
         )
 
-        data = beamforming( 
-            rf, 
-            save_path=h5_path,
-            SNR_dB=args.snr,         
-        )
+        if args.mvdr == True:
+            png_path = os.path.join(img_dir, f"{filename_base}_mvdr.png")
+            data = mvdr_beamforming( 
+                rf, 
+                Nelem = args.nelem,
+                SNR_dB=args.snr,         
+            )
+        else:
+            png_path = os.path.join(img_dir, f"{filename_base}.png")
+            data = beamforming( 
+                rf, 
+                Nelem = args.nelem,
+                SNR_dB=args.snr,         
+            )
 
         if h5_path is not None:
             save_h5(h5_path, data)
+            save_image(png_path, data)
             print(f'Saved: {h5_path}')
     
     print("\n--- Terminé ! ---")# ============================
