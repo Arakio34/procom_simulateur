@@ -1,6 +1,5 @@
 import numpy as np
 import h5py
-import matplotlib.pyplot as plt
 from scipy.signal import hilbert
 from scipy.linalg import inv, pinv
 from scipy.io import savemat
@@ -11,9 +10,7 @@ import os
 def beamforming(
     rf,
     Nelem=80,
-    save_path=None,
-    SNR_dB=10.0,
-    plot=False,):
+    SNR_dB=10.0,):
 
     c        = 1540.0
     f0       = 5e6
@@ -131,69 +128,123 @@ def beamforming(
 
 def mvdr_beamforming(rf, Nelem=80, SNR_dB=10.0, regularization=0.1):
     """
-    Implémentation simplifiée du MVDR/Capon
+    Implémentation Corrigée du MVDR/Capon
     """
-    # ... (Reprendre les mêmes paramètres de grille que votre fonction beamforming) ...
     c, f0, fs = 1540.0, 5e6, 40e6
     x_span, z_min, z_max = 20e-3, 10e-3, 50e-3
-    Nx, Nz = 128, 128 # Réduit pour l'exemple (256x256 est très lent en MVDR pur CPU)
     
-    # 1. Alignement Temporel (Exactement comme dans votre DAS)
-    # On recalcule y_align (les signaux alignés sur chaque pixel)
-    # ... (Copier la logique de calcul de y_align de votre fonction beamforming) ...
-    # Supposons qu'on a récupéré y_align de forme (Nelem, Nx, Nz)
+    # On réduit la résolution pour que le calcul MVDR (très lourd) ne prenne pas 1 heure
+    # Tu peux remonter à 256 si tu es patient
+    Nx, Nz = 64, 64 
     
-    # Pour le MVDR, il est préférable de travailler sur le signal Analytique (Complexe)
-    # pour avoir l'information de phase correcte lors du calcul de covariance.
-    y_align_analytic = hilbert(y_align, axis=0) # Hilbert sur l'axe temporel (capteurs) ? 
-    # Non, attention : Hilbert doit être fait sur le signal RF brut ou temporellement.
-    # Ici, pour simplifier, on suppose y_align complexe ou on le fait pixel par pixel.
-    
-    # Structure de sortie
+    x_img    = np.linspace(-x_span / 2, x_span / 2, Nx)
+    z_img    = np.linspace(z_min, z_max, Nz)
+
+    # --- 1. Préparation des données (Crucial pour MVDR) ---
+    # On passe en complexe (Analytique) TOUT DE SUITE pour garder la phase
+    rf_analytic = hilbert(rf, axis=0) 
+
     bmode_mvdr = np.zeros((Nz, Nx), dtype=np.float32)
     
-    # Vecteur de direction (Steering vector) : Comme tout est aligné, on cherche la somme
-    # donc a est un vecteur de 1.
+    # Matrice pour stocker les signaux alignés (Complexe maintenant !)
+    y_align   = np.zeros((Nelem, Nx, Nz), dtype=np.complex64)
+
+    pitch    = 0.15e-3
+    aperture = (Nelem - 1) * pitch
+    x_el     = np.linspace(-aperture / 2, aperture / 2, Nelem)
+
+    # Axe temporel
+    z_max_toa = z_max / c
+    r_max     = np.sqrt((x_span / 2 + aperture / 2) ** 2 + z_max ** 2)
+    t_max     = z_max_toa + r_max / c + 2 / f0
+    t         = np.arange(0.0, t_max + 1.0 / fs, 1.0 / fs)
+    
+    # Pulse pour reference (optionnel ici mais gardé pour cohérence)
+    pulseT  = 2.5 / f0
+
+    print("1/2 : Alignement des signaux (Delay)...")
+    
+    # --- 2. Phase d'Alignement (Delay) ---
+    # C'est la partie qui manquait !
+    for ix in range(Nx):
+        x0 = x_img[ix]
+        # On vectorise sur Z pour aller un peu plus vite
+        for n in range(Nelem):
+            dx = x0 - x_el[n]
+            # Distance pour tous les points Z d'une colonne
+            Rrx = np.sqrt(dx ** 2 + z_img ** 2) 
+            tau_tot = (z_img / c) + (Rrx / c)
+            
+            # Interpolation complexe (Reel et Imag séparés car numpy ne gère pas interp complexe direct)
+            val_real = np.interp(tau_tot, t, np.real(rf_analytic[:, n]), left=0.0, right=0.0)
+            val_imag = np.interp(tau_tot, t, np.imag(rf_analytic[:, n]), left=0.0, right=0.0)
+            
+            y_align[n, ix, :] = val_real + 1j * val_imag
+
+    print("2/2 : Calcul des poids MVDR (Inversion Matrice)...")
+
+    # --- 3. Phase MVDR (Calcul des poids w) ---
+    # Vecteur de direction (Steering vector) : Comme on a déjà aligné les signaux,
+    # on veut juste sommer en phase -> vecteur de 1.
     a = np.ones((Nelem, 1), dtype=np.complex64)
     
-    # Facteur de "Diagonal Loading" pour rendre l'inversion stable (indispensable)
-    # On ajoute un petit bruit fictif sur la diagonale de la matrice R
-    delta = regularization * np.trace(np.eye(Nelem)) / Nelem 
-
-    print("Calcul MVDR en cours (patience...)...")
-    
-    # Boucle sur les pixels 
     for iz in range(Nz):
         for ix in range(Nx):
-            # 1. Récupérer le vecteur de données pour ce pixel (Snapshot)
-            # Forme : (Nelem, 1)
-            x_vec = y_align_analytic[:, ix, iz].reshape(-1, 1)
+            # Snapshot : le vecteur signal reçu par les N capteurs pour ce pixel
+            # Forme (Nelem, 1)
+            x_vec = y_align[:, ix, iz].reshape(-1, 1)
             
-            # 2. Calculer la Matrice de Covariance R
-            # En pratique, on moyenne R sur une petite fenêtre spatiale (Spatial Smoothing)
-            # pour avoir une stat robuste. Ici, on fait du "Snapshot MVDR" simple :
+            # Calcul de la Covariance Spatiale R = x * x^H
+            # (Note: En vrai MVDR robuste, on fait du "Spatial Smoothing" ici, 
+            # c'est-à-dire qu'on moyenne R sur des sous-réseaux, mais commençons simple)
             R = x_vec @ x_vec.conj().T
             
-            # Ajout du Diagonal Loading (Régularisation)
-            R = R + delta * np.eye(Nelem)
-            
-            # 3. Calcul des poids MVDR : w = (R^-1 * a) / (a^H * R^-1 * a)
-            # On utilise pinv ou solve pour la stabilité
-            try:
-                R_inv = np.linalg.inv(R)
-            except np.linalg.LinAlgError:
-                R_inv = np.linalg.pinv(R)
+            # Diagonal Loading (Indispensable pour inverser R qui est de rang 1 ici)
+            # On prend un % de la puissance moyenne (trace)
+            power = np.trace(R).real
+            if power < 1e-12: 
+                # Si le pixel est vide (bruit pur), on met 0 et on passe
+                bmode_mvdr[iz, ix] = 0.0
+                continue
                 
-            num = R_inv @ a
+            delta = (regularization * power / Nelem) 
+            R_loaded = R + delta * np.eye(Nelem)
+            
+            # Calcul des poids w = (R^-1 * a) / (a^H * R^-1 * a)
+            try:
+                # solve est plus rapide et stable que inv
+                # On résout R * num = a  => num = R^-1 * a
+                num = np.linalg.solve(R_loaded, a)
+            except np.linalg.LinAlgError:
+                # Fallback si singulier
+                num = np.linalg.pinv(R_loaded) @ a
+                
             den = a.conj().T @ num
             w = num / den
             
-            # 4. Appliquer les poids (Beamforming)
+            # Application du poids (Beamforming)
             pixel_val = w.conj().T @ x_vec
             
-            # On stocke le module (l'énergie)
             bmode_mvdr[iz, ix] = np.abs(pixel_val)
 
     # Conversion en dB
-    bmode_dB = 20 * np.log10(bmode_mvdr / np.max(bmode_mvdr) + 1e-12)
-    return bmode_dB
+    # On ajoute epsilon pour éviter log(0)
+    val_max = np.max(bmode_mvdr)
+    if val_max == 0: val_max = 1.0 # Sécurité
+    
+    bmode_dB = 20 * np.log10(bmode_mvdr / val_max + 1e-12)
+
+    # Structure de retour identique à ta fonction précédente
+    meta = {
+        'c': c, 'f0': f0, 'fs': fs, 'Nelem': Nelem,
+        'pitch': pitch, 'x_img': x_img, 'z_img': z_img,
+    }
+
+    data = {
+        'rf': rf,
+        'x_img': x_img,
+        'z_img': z_img,
+        'bmode_dB': bmode_dB,
+        'meta': meta,
+    }
+    return data
