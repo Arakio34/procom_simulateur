@@ -131,7 +131,7 @@ def beamforming(
 
 def mvdr_beamforming(rf, Nelem=80, SNR_dB=10.0, regularization=0.1):
     """
-    Implémentation simplifiée du MVDR (Capon Beamformer).
+    Implémentation simplifiée du MVDR/Capon
     """
     # ... (Reprendre les mêmes paramètres de grille que votre fonction beamforming) ...
     c, f0, fs = 1540.0, 5e6, 40e6
