@@ -126,6 +126,7 @@ def beamforming(
     }
     return data
 
+#Fonction mvdr_beamforming generé a l'aide de gemini AI [Google]
 def mvdr_beamforming(rf, Nelem=80, SNR_dB=10.0, regularization=0.1):
     """
     Implémentation Corrigée du MVDR/Capon
