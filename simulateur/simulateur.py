@@ -7,6 +7,19 @@ from scipy.io import savemat
 from scipy.signal.windows import hann
 import argparse
 import os
+# TODO
+# Changement du comportement : 
+# - Desctiption de l'environnement soit via Json soit via terminal
+# - Pouvoire choisire une desciption total des cibles via Json
+# - Soit aleatoire avec une seed pour les cible
+
+# Changement d'architecture :
+# - Description de de la scene en Json
+# - Description de des cibles en Json
+#
+# wrapper json -> objet cibles 
+# wrapper json -> objet scene 
+
 
 def generate_bright_point(
     seed,
@@ -25,16 +38,17 @@ def generate_bright_point(
         bright_points[nb][2] = round(rng.uniform(amp_range[0], amp_range[1]) )
     return bright_points
         
-
+# bp List au format [[x1,z1,i1],[x2,z2,i2],...,[xn,zn,in]]
 def simulate_us_scene(
     SNR_dB=10.0,
     Nelem=80,
     seed=None,
     max_point=3,
+    generate_bp=True,
+    bp_list=None
 ):
     """
     Simule une image d'échographie B-mode et les RF associés.
-
     Retourne un dict avec rf, bmode_dB, env, meta, etc.
     """
 
@@ -111,11 +125,19 @@ def simulate_us_scene(
     #  Points brillants
     # ============================
 
-    bright_points = generate_bright_point(seed,max_point)
+    if generate_bp == True:
+        bright_points = generate_bright_point(seed,max_point)
+    else:
+        bright_points = bp_list
+
 
     xs = bright_points[:, 0]
     zs = bright_points[:, 1]
     as_ = bright_points[:, 2]
+
+    print(xs)
+    print(zs)
+    print(as_)
 
     N_scatt = as_.size
 
