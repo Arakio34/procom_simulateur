@@ -106,7 +106,6 @@ ani = animation.FuncAnimation(fig, update, frames=frames, interval=50, blit=Fals
 # Sauvegarder en GIF
 # writer='pillow' est le moteur de création de GIF intégré
 # fps=20 définit la fluidité (20 images par seconde)
-ani.save('animation_onde.gif', writer='pillow', fps=20)
 
 print("Sauvegarde terminée : animation_onde.gif")
 

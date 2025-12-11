@@ -14,7 +14,7 @@ sigma_t = 0.5e-6    # Durée de l'impulsion (assez courte)
 # Grille de simulation (Zone de 6mm x 6mm)
 Nx, Nz = 300, 300
 x_range = np.linspace(-4e-3, 4e-3, Nx)
-z_range = np.linspace(0, 6e-3, Nz)
+z_range = np.linspace(0, 25e-3, Nz)
 X, Z = np.meshgrid(x_range, z_range)
 
 # Position des émetteurs
