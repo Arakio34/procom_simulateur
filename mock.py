@@ -8,6 +8,7 @@ from minio import Minio
 from minio.error import S3Error
 
 from das_processor import DasProcessingError, process_das_task
+from mv_processor import MVProcessingError, process_mv_task
 
 # =====================
 # CONFIG
@@ -116,6 +117,23 @@ def process_job(payload: dict):
                 outputs[task] = das_outputs["png"]
                 outputs[f"{task}_png"] = das_outputs["png"]
                 print(f"📦 DAS output uploaded → {das_outputs}")
+                continue
+
+        if task == "MV":
+            print("▶ Running MV beamforming processing")
+            try:
+                mv_outputs = process_mv_task(
+                    minio_client=minio_client,
+                    bucket=BUCKET,
+                    payload=payload,
+                )
+            except MVProcessingError as e:
+                print(f"❌ MV processing failed: {e}")
+                raise
+            else:
+                outputs[task] = mv_outputs["png"]
+                outputs[f"{task}_png"] = mv_outputs["png"]
+                print(f"📦 MV output uploaded → {mv_outputs}")
                 continue
 
         fake_output = BytesIO()
