@@ -1,45 +1,86 @@
-# Simulateur Échographique B-Mode (Python)
+# Simulateur Echographique B-Mode (Python)
 
-Ce projet est un simulateur léger d'imagerie ultrasonore (échographie) codé en Python. Il génère des données brutes RF (Radio-Frequency) et reconstitue des images B-mode via un beamforming DAS (Delay-and-Sum) classique.
+Ce projet est un simulateur léger d'imagerie ultrasonore (échographie) codé en Python. Il génère des données brutes RF (Radio-Frequency) et reconstitue des images B-mode.
 
-Le simulateur modélise une émission en **Onde Plane (Plane Wave)** et inclut la gestion du *speckle* et de cibles ponctuelles (points brillants).
+Le simulateur modélise une émission en Onde Plane (Plane Wave) et permet de simuler des cibles ponctuelles (points brillants) de manière aléatoire ou déterministe. Il supporte deux méthodes de reconstruction d'image : le DAS (Delay-and-Sum) classique et le MVDR (Minimum Variance Distortionless Response).
 
-## 📋 Fonctionnalités
-- **Simulation Physique :** Modélisation de la réponse impulsionnelle, délais de vol, et atténuation géométrique.
-- **Beamforming :** Reconstruction d'image par méthode "Delay-and-Sum" (DAS).
-- **Correction d'Artefacts :** Gestion des effets de bord de la transformée de Hilbert (Zero-padding) et respect du critère de Nyquist spatial.
-- **Export de Données :** Sauvegarde des données brutes (RF) et traitées (Enveloppe, B-mode) au format `.h5` (HDF5).
-- **Visualisation :** Génération automatique des images `.png`.
+## Fonctionnalites
 
-## ⚙️ Installation des Dépendances
+- Simulation Physique : Modelisation de la reponse impulsionnelle, delais de vol et attenuation geometrique (1/R).
+- Beamforming Flexible :
+  - DAS : Reconstruction standard "Delay-and-Sum".
+  - MVDR : Reconstruction adaptative (Capon) pour une meilleure resolution (implementation corrigee avec Diagonal Loading).
+- Scenarios Personnalisables : Generation aleatoire de cibles ou chargement precis via un fichier JSON.
+- Export de Donnees : Sauvegarde des donnees brutes (RF), traitees (B-mode) et des metadonnees au format .h5 (HDF5).
+- Outils Pedagogiques : Scripts d'animation pour visualiser les phenomenes physiques (Huygens, interferences, interpolation).
 
-Pour garantir un environnement propre et reproductible, suivez ces étapes :
+## Installation
 
-### 1. Création et Activation de l'Environnement Virtuel (Recommandé)
+Il est recommande d'utiliser un environnement virtuel pour isoler les dependances.
 
-Il est fortement recommandé d'utiliser un environnement virtuel (`venv`) pour isoler les dépendances de votre projet :
-
-```bash
-# Crée l'environnement (nommé 'venv')
-python -m venv venv 
-
-# Active l'environnement (Linux/macOS)
+# Creation et activation de l'environnement virtuel (Linux/macOS)
+python -m venv venv
 source venv/bin/activate
 
+# Installation des dependances
 pip install -r requirements.txt
-```
 
-## 🚀 Utilisation en Ligne de Commande
+## Utilisation du Simulateur (main.py)
 
-Le script main.py s'utilise avec des arguments pour configurer la génération des données.
+Le script principal simulateur/main.py permet de lancer la simulation et la reconstruction.
 
-### Options de Configuration
+### Exemples de commandes
 
-Vous pouvez personnaliser l'exécution avec les arguments suivants :
+1. Generation aleatoire (DAS standard) :
+Genere 5 images contenant chacune jusqu'a 3 cibles aleatoires.
+python simulateur/main.py --num 5 --maxpoint 3 --out data_random
 
-* **`--num`** (Type int, Défaut: 10) : Définit le nombre d'images (scènes) à simuler et à enregistrer.
-* **`--out`** (Type str, Défaut: data) : Définit le dossier racine de sortie. Le script crée automatiquement les sous-dossiers /h5 (pour les données brutes) et /images (pour les PNG) à l'intérieur.
-* **`--show`** (Type flag, Défaut: False) : Active l'affichage des fenêtres graphiques matplotlib pendant la génération. Note : Ceci est un mode interactif et bloquant.
-* **`--speckle`** (Type int, Défaut: 0) : Définit le nombre de points de speckle (diffuseurs aléatoires) dans le volume. Mettre 0 pour n'avoir que les points brillants.
-* **`--snr`** (Type float, Défaut: 15.0) : Définit le Rapport Signal/Bruit (SNR) désiré, exprimé en décibels (dB).
-* **`--nelem`** (Type int, Défaut: 80) : Définit le nombre de capteur simuler.
+2. Simulation definie par JSON avec MVDR :
+Simule une scene precise decrite dans un fichier JSON et utilise l'algorithme MVDR.
+python simulateur/main.py --json-file scene.json --mvdr True --out data_json
+
+### Arguments disponibles
+
+--num (int, Defaut: 10) : Nombre d'images a generer (si aucun fichier JSON n'est fourni).
+--json-file (str, Defaut: None) : Chemin vers un fichier JSON definissant les cibles (voir format ci-dessous). Ignore --num et --maxpoint si utilise.
+--out (str, Defaut: data) : Dossier racine de sortie (cree automatiquement les sous-dossiers /h5 et /images).
+--snr (float, Defaut: 15.0) : Rapport Signal/Bruit (SNR) desire en decibels (dB).
+--nelem (int, Defaut: 80) : Nombre de capteurs de la sonde.
+--mvdr (bool, Defaut: False) : Active le beamforming MVDR (Capon) au lieu du DAS standard.
+--maxpoint (int, Defaut: 3) : Nombre maximum de cibles par image (en mode generation aleatoire).
+
+### Format du fichier JSON (--json-file)
+
+Le fichier JSON doit contenir une cle principale "points" qui est une liste de listes. Chaque point est defini par [position_x, position_z, amplitude].
+
+- x : Position laterale en metres (ex: 0.0 pour le centre).
+- z : Profondeur en metres (ex: 0.03 pour 30mm).
+- amplitude : Reflectivite de la cible.
+
+Exemple scene.json :
+{
+    "points": [
+        [-0.005, 0.030, 2.0],
+        [0.005, 0.040, 5.0]
+    ]
+}
+
+## Animations Pedagogiques (anime/)
+
+Le dossier anime/ contient des scripts autonomes pour visualiser les concepts physiques des ultrasons. Ils generent des fichiers .gif ou affichent des animations.
+
+- huygen.py : Visualisation du principe de Huygens (aller-retour onde plane/onde spherique).
+- interference.py : Simulation d'interferences destructives/constructives entre deux sources.
+- interpolation.py : Explication visuelle du re-echantillonnage (necessaire pour le beamforming).
+- test.py : Animation d'une onde plane rencontrant deux cibles.
+
+Pour lancer une animation :
+python anime/huygen.py
+
+## Structure des donnees (.h5)
+
+Les fichiers HDF5 generes contiennent :
+- rf : Donnees brutes (forme [Temps, Capteurs]).
+- bmode_dB : Image finale en echelle logarithmique.
+- y_align : Signaux alignes (apres decalage temporel).
+- meta : Dictionnaire contenant les parametres physiques (c, fs, f0, pitch, etc.).
