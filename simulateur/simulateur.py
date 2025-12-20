@@ -142,6 +142,15 @@ def simulate_us_scene(
     N_scatt = as_.size
 
     # ============================
+    #  Couche absorbante
+    # ============================
+
+    #   [[zmin1,zmax2,a1],
+    #    [zmin2,zmax2,a2],
+    #    ...
+    #    ]
+    couches = [[40e-3,50e-3,-20]]
+    # ============================
     # Synthèse RF
     # ============================
     rf = np.zeros((Nt, Nelem), dtype=np.float32)
