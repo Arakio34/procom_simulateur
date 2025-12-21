@@ -145,11 +145,28 @@ def simulate_us_scene(
     #  Couche absorbante
     # ============================
 
-    #   [[zmin1,zmax2,a1],
-    #    [zmin2,zmax2,a2],
-    #    ...
+    #   [[zmin1,zmax2,v_1],
+    #    [zmin2,zmax2,v_2],
+    #  ...
     #    ]
-    couches = [[40e-3,50e-3,-20]]
+    # avec v_i le coeficient de reflexion
+
+    couches = np.array([[20e-3,40e-3,0.40]])
+    #Juste pour le fun de fair un droite
+    droite = np.linspace(0,10e-3,Nelem)
+    for n in range(couches.shape[0]):
+        #Debut de la couche
+        xs = np.append(xs,x_el.reshape(-1,1))
+        zs = np.append(zs,np.full(Nelem,couches[n][0])+droite)
+        as_ = np.append(as_,np.full(Nelem,couches[n][2]))
+
+        #Fin de la couche
+        xs = np.append(xs,x_el.reshape(-1,1))
+        zs = np.append(zs,np.full(Nelem,couches[n][1]))
+        as_ = np.append(as_,np.full(Nelem,couches[n][2]**2))
+    #TODO ! En utilisant la methode diffuseur, chaque capteur prend en compte l'onde reflechis a chaque point de l'interface
+    # entre le milieu 1 et 2. Cella pose probleme etant donner que seul le capteur en direct resoit l'onde
+    
     # ============================
     # Synthèse RF
     # ============================
@@ -172,7 +189,7 @@ def simulate_us_scene(
 
         sig_n = np.zeros(Nt, dtype=np.float32)
 
-        for k in range(N_scatt):
+        for k in range(as_.shape[0]):
             # Retard du PB k par rapport au capteur n
             tk = tau[k]
             # Amplitude par rapport au niveau de reflexion [as] et a l'attenuation [att]
