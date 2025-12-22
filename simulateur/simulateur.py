@@ -69,8 +69,11 @@ def simulate_us_scene(
     # ============================
     # Paramètres de base
     # ============================
-    c        = 1540.0
-    f0       = 5e6
+    c        = 1540.0 # Vitesse (reference corp humain) [m/s]
+    c1        = 1455.0 # Vitesse (graisse) [m/s]
+    p        = 985.0  # Masse volumique (reference corp humain) [kg/m³]
+    p1       = 900.0  # Masse volumique (graisse) [kg/m³]
+    f0       = 5e6    # Frequence  [Hz]
     fracBW   = 0.6
     fs       = 40e6
     lam      = c / f0
@@ -135,10 +138,6 @@ def simulate_us_scene(
     zs = bright_points[:, 1]
     as_ = bright_points[:, 2]
 
-    print(xs)
-    print(zs)
-    print(as_)
-
     N_scatt = as_.size
 
     # ============================
@@ -151,49 +150,55 @@ def simulate_us_scene(
     #    ]
     # avec v_i le coeficient de reflexion
 
-    couches = np.array([[20e-3,40e-3,0.40]])
-    #Juste pour le fun de fair un droite
-    droite = np.linspace(0,10e-3,Nelem)
-    for n in range(couches.shape[0]):
-        #Debut de la couche
-        xs = np.append(xs,x_el.reshape(-1,1))
-        zs = np.append(zs,np.full(Nelem,couches[n][0])+droite)
-        as_ = np.append(as_,np.full(Nelem,couches[n][2]))
+    couches = np.array([[20e-3,40e-3,c1,p1],[15e-3,20e-3,1555.0,1000.0]])
+    impedence_i = couches[:,2]*couches[:,3]
+    impedence = p*c
+    coef_ref = (impedence_i - impedence) / (impedence_i + impedence)
+    coef_ref = np.where(coef_ref < 0, np.abs(coef_ref),coef_ref)
+    
+    print(coef_ref)
 
-        #Fin de la couche
-        xs = np.append(xs,x_el.reshape(-1,1))
-        zs = np.append(zs,np.full(Nelem,couches[n][1]))
-        as_ = np.append(as_,np.full(Nelem,couches[n][2]**2))
+
     #TODO ! En utilisant la methode diffuseur, chaque capteur prend en compte l'onde reflechis a chaque point de l'interface
     # entre le milieu 1 et 2. Cella pose probleme etant donner que seul le capteur en direct resoit l'onde
-    
-    # ============================
-    # Synthèse RF
-    # ============================
-    rf = np.zeros((Nt, Nelem), dtype=np.float32)
+    for n in range(couches.shape[0]):
+        d1  = (couches[:,0] - z_min)
+        e =(couches[:,1] - couches[:,0])
+        t1  = 2*d1 / c # Retard a la premier interface
+        t2  = t1 + e*2/couches[:,2] # Retard a la seconde interface
+        att1 = 1/np.maximum(d1**2, 1e-3) * coef_ref
+        att2 = 1/np.maximum((d1+e)**2, 1e-3) * (1-coef_ref)**2 * coef_ref
 
+
+    rf = np.zeros((Nt, Nelem), dtype=np.float32)
     for n in range(Nelem):
         #Calcule de la distance sur l'axe des x 
         dx_n = xs - x_el[n]
         #Calcule de la distance radial
         Rrx  = np.sqrt(dx_n ** 2 + zs ** 2)
+
         #Temps de propagation aller (onde plane)
         t_tx = zs / c
+
         #Temps de propagation retour 
         t_rx = Rrx / c
+
         #Retard total
         tau  = t_tx + t_rx
 
-        #Attenuation en 1/R avec un np.maximum pour eviter les division par zeros
-        att  = 1.0 / np.maximum(Rrx, 1e-3)
+        #Attenuation en 1/R^2 avec un np.maximum pour eviter les division par zeros
+        att  = 1.0 / np.maximum(Rrx**2, 1e-3)
 
         sig_n = np.zeros(Nt, dtype=np.float32)
 
-        for k in range(as_.shape[0]):
+        for k in range(Nelem):
+
             # Retard du PB k par rapport au capteur n
             tk = tau[k]
+
             # Amplitude par rapport au niveau de reflexion [as] et a l'attenuation [att]
             ak = as_[k] * att[k]
+
             sig_n += np.float32(
                 ak * np.interp(t, t_pulse + tk, pulse, left=0.0, right=0.0)
             )
