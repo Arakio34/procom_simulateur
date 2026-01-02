@@ -132,6 +132,7 @@ def simulate_us_scene(
     if generate_bp == True:
         bright_points = generate_bright_point(seed,max_point)
     else:
+        bright_points = bp_list
 
     xs = bright_points[:, 0]
     zs = bright_points[:, 1]
