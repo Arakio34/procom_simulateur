@@ -176,8 +176,8 @@ def simulate_us_scene(
         e =(couches[n,1] - couches[n,0])
         t1  = 2*d1 / c # Retard a la premier interface
         t2  = t1 + e*2/couches[n,2] # Retard a la seconde interface
-        att1 = 1/np.maximum((1*d1)**2, 1e-3) * coef_ref[n]
-        att2 = 1/np.maximum((1*(d1+e))**2, 1e-3) * coef_ref[n]* (1-coef_ref[n])**2
+        att1 = 1/np.maximum((1*d1*(10^3))**2, 1e-3) * coef_ref[n]
+        att2 = 1/np.maximum((1*(d1+e)*(10^3))**2, 1e-3) * coef_ref[n]* (1-coef_ref[n])**2
         sig_c += np.float32(
             att1 * np.interp(t, t_pulse + t1, pulse, left=0.0, right=0.0)
         )
@@ -217,10 +217,11 @@ def simulate_us_scene(
                 delta_rx = dist_oblique_layer * (1.0/v_layer - 1.0/c)
                 t_rx = t_rx + delta_rx
 
-                if thickness_crossed == (z_max_layer - z_min_layer):
-                    att_layer = coef_ref[n]**2 *(1-coef_ref[n])**2
+                
+                if np.any(thickness_crossed) == (z_max_layer - z_min_layer):
+                    att_layer = coef_ref[i_layer]**2 *(1-coef_ref[i_layer])**2
                 else:
-                    att_layer= coef_ref[n]*(1-coef_ref[n])
+                    att_layer= coef_ref[i_layer]*(1-coef_ref[i_layer])
             else:
                 att_layer = 1
 
@@ -229,7 +230,7 @@ def simulate_us_scene(
         tau  = t_tx + t_rx
 
         #Attenuation en 1/R^2 avec un np.maximum pour eviter les division par zeros
-        att  = 1.0 / np.maximum(Rrx**2, 1e-3) * att_layer
+        att  = (1.0 / np.maximum((Rrx*(10^3))**2, 1e-3) )* att_layer
 
         sig_n = np.zeros(Nt, dtype=np.float32)
 
