@@ -150,24 +150,32 @@ def simulate_us_scene(
     #    ]
     # avec v_i le coeficient de reflexion
 
-    couches = np.array([[20e-3,40e-3,c1,p1],[15e-3,20e-3,1555.0,1000.0]])
+    couches = np.array([[30e-3,35e-3,c1,p1]])
     impedence_i = couches[:,2]*couches[:,3]
     impedence = p*c
     coef_ref = (impedence_i - impedence) / (impedence_i + impedence)
     coef_ref = np.where(coef_ref < 0, np.abs(coef_ref),coef_ref)
     
-    print(coef_ref)
 
 
     #TODO ! En utilisant la methode diffuseur, chaque capteur prend en compte l'onde reflechis a chaque point de l'interface
     # entre le milieu 1 et 2. Cella pose probleme etant donner que seul le capteur en direct resoit l'onde
+
+    sig_c = np.zeros(Nt, dtype=np.float32)
     for n in range(couches.shape[0]):
-        d1  = (couches[:,0] - z_min)
-        e =(couches[:,1] - couches[:,0])
+        d1  = (couches[n,0])
+        e =(couches[n,1] - couches[n,0])
         t1  = 2*d1 / c # Retard a la premier interface
-        t2  = t1 + e*2/couches[:,2] # Retard a la seconde interface
-        att1 = 1/np.maximum(d1**2, 1e-3) * coef_ref
-        att2 = 1/np.maximum((d1+e)**2, 1e-3) * (1-coef_ref)**2 * coef_ref
+        t2  = t1 + e*2/couches[n,2] # Retard a la seconde interface
+        att1 = 1/np.maximum((1*d1)**2, 1e-3) * coef_ref[n]
+        att2 = 1/np.maximum((1*(d1+e))**2, 1e-3) * coef_ref[n]* (1-coef_ref[n])**2
+        sig_c += np.float32(
+            att1 * np.interp(t, t_pulse + t1, pulse, left=0.0, right=0.0)
+        )
+        sig_c += np.float32(
+            att2 * np.interp(t, t_pulse + t2, pulse, left=0.0, right=0.0)
+        )
+        
 
 
     rf = np.zeros((Nt, Nelem), dtype=np.float32)
@@ -191,7 +199,7 @@ def simulate_us_scene(
 
         sig_n = np.zeros(Nt, dtype=np.float32)
 
-        for k in range(Nelem):
+        for k in range(N_scatt):
 
             # Retard du PB k par rapport au capteur n
             tk = tau[k]
@@ -202,8 +210,11 @@ def simulate_us_scene(
             sig_n += np.float32(
                 ak * np.interp(t, t_pulse + tk, pulse, left=0.0, right=0.0)
             )
-        rf[:, n] = sig_n
+        rf[:, n] = sig_n + sig_c
 
+    plt.figure(figsize=(10,4))
+    plt.plot(t,rf[:,2])
+    plt.savefig("mong.png")
     # ============================
     # Bruit
     # ============================
