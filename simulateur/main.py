@@ -34,7 +34,7 @@ if __name__ == "__main__":
         for point in points:
             print(f"  - {point}")
         rand_gen = False
-        num = points.shape[0]
+        num = 1
     else:
         points = None
         rand_gen = True
