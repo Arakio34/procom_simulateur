@@ -12,7 +12,10 @@ import argparse
 import json
 import os
 
-def load_json_data(filepath):
+
+
+
+def load_scene_data(filepath):
     """
     Fonction de type personnalisée pour argparser.
     Charge un fichier JSON, vérifie s'il contient la clé 'points',
@@ -57,8 +60,19 @@ def load_json_data(filepath):
                 f"Le point à l'index {i} ('{point}') doit contenir uniquement des valeurs numériques (float/int)."
             )
 
-    # Retourne la liste des points validés
-    return points_list
+    layers_list = data.get('layers', []) # Retourne liste vide si pas de couches
+
+    for i, layer in enumerate(layers_list):
+        required_keys = {'z_min', 'z_max', 'c', 'rho'}
+        if not required_keys.issubset(layer.keys()):
+             raise argparse.ArgumentTypeError(
+                f"La couche {i} doit contenir les clés : {required_keys}"
+            )
+
+    return {
+        "points": points_list,
+        "layers": layers_list
+    }
 
 def save_image(save_png_path,data):
     # ============================
