@@ -69,8 +69,11 @@ def simulate_us_scene(
     # ============================
     # Paramètres de base
     # ============================
-    c        = 1540.0
-    f0       = 5e6
+    c        = 1540.0 # Vitesse (reference corp humain) [m/s]
+    c1        = 1455.0 # Vitesse (graisse) [m/s]
+    p        = 985.0  # Masse volumique (reference corp humain) [kg/m³]
+    p1       = 900.0  # Masse volumique (graisse) [kg/m³]
+    f0       = 5e6    # Frequence  [Hz]
     fracBW   = 0.6
     fs       = 40e6
     lam      = c / f0
@@ -135,44 +138,83 @@ def simulate_us_scene(
     zs = bright_points[:, 1]
     as_ = bright_points[:, 2]
 
-    print(xs)
-    print(zs)
-    print(as_)
-
     N_scatt = as_.size
 
     # ============================
-    # Synthèse RF
+    #  Couche absorbante
     # ============================
-    rf = np.zeros((Nt, Nelem), dtype=np.float32)
 
+    #   [[zmin1,zmax2,v_1],
+    #    [zmin2,zmax2,v_2],
+    #  ...
+    #    ]
+    # avec v_i le coeficient de reflexion
+
+    couches = np.array([[30e-3,35e-3,c1,p1]])
+    impedence_i = couches[:,2]*couches[:,3]
+    impedence = p*c
+    coef_ref = (impedence_i - impedence) / (impedence_i + impedence)
+    coef_ref = np.where(coef_ref < 0, np.abs(coef_ref),coef_ref)
+    
+
+
+    #TODO ! En utilisant la methode diffuseur, chaque capteur prend en compte l'onde reflechis a chaque point de l'interface
+    # entre le milieu 1 et 2. Cella pose probleme etant donner que seul le capteur en direct resoit l'onde
+
+    sig_c = np.zeros(Nt, dtype=np.float32)
+    for n in range(couches.shape[0]):
+        d1  = (couches[n,0])
+        e =(couches[n,1] - couches[n,0])
+        t1  = 2*d1 / c # Retard a la premier interface
+        t2  = t1 + e*2/couches[n,2] # Retard a la seconde interface
+        att1 = 1/np.maximum((1*d1)**2, 1e-3) * coef_ref[n]
+        att2 = 1/np.maximum((1*(d1+e))**2, 1e-3) * coef_ref[n]* (1-coef_ref[n])**2
+        sig_c += np.float32(
+            att1 * np.interp(t, t_pulse + t1, pulse, left=0.0, right=0.0)
+        )
+        sig_c += np.float32(
+            att2 * np.interp(t, t_pulse + t2, pulse, left=0.0, right=0.0)
+        )
+        
+
+
+    rf = np.zeros((Nt, Nelem), dtype=np.float32)
     for n in range(Nelem):
         #Calcule de la distance sur l'axe des x 
         dx_n = xs - x_el[n]
         #Calcule de la distance radial
         Rrx  = np.sqrt(dx_n ** 2 + zs ** 2)
+
         #Temps de propagation aller (onde plane)
         t_tx = zs / c
+
         #Temps de propagation retour 
         t_rx = Rrx / c
+
         #Retard total
         tau  = t_tx + t_rx
 
-        #Attenuation en 1/R avec un np.maximum pour eviter les division par zeros
-        att  = 1.0 / np.maximum(Rrx, 1e-3)
+        #Attenuation en 1/R^2 avec un np.maximum pour eviter les division par zeros
+        att  = 1.0 / np.maximum(Rrx**2, 1e-3)
 
         sig_n = np.zeros(Nt, dtype=np.float32)
 
         for k in range(N_scatt):
+
             # Retard du PB k par rapport au capteur n
             tk = tau[k]
+
             # Amplitude par rapport au niveau de reflexion [as] et a l'attenuation [att]
             ak = as_[k] * att[k]
+
             sig_n += np.float32(
                 ak * np.interp(t, t_pulse + tk, pulse, left=0.0, right=0.0)
             )
-        rf[:, n] = sig_n
+        rf[:, n] = sig_n + sig_c
 
+    plt.figure(figsize=(10,4))
+    plt.plot(t,rf[:,2])
+    plt.savefig("mong.png")
     # ============================
     # Bruit
     # ============================
