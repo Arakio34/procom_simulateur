@@ -132,8 +132,6 @@ def simulate_us_scene(
     if generate_bp == True:
         bright_points = generate_bright_point(seed,max_point)
     else:
-        bright_points = bp_list
-
 
     xs = bright_points[:, 0]
     zs = bright_points[:, 1]
@@ -218,7 +216,6 @@ def simulate_us_scene(
                 delta_rx = dist_oblique_layer * (1.0/v_layer - 1.0/c)
                 t_rx = t_rx + delta_rx
 
-    
                 if thickness_crossed == (z_max_layer - z_min_layer):
                     att_layer = coef_ref[n]**2 *(1-coef_ref[n])**2
                 else:
