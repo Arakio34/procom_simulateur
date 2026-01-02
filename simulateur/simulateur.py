@@ -45,7 +45,8 @@ def simulate_us_scene(
     seed=None,
     max_point=3,
     generate_bp=True,
-    bp_list=None
+    bp_list=None,
+    layers_list=None
 ):
     """
     Simule une image d'échographie B-mode et les RF associés.
@@ -149,17 +150,26 @@ def simulate_us_scene(
     #  ...
     #    ]
     # avec v_i le coeficient de reflexion
+    if layers_list:
+        couches_data = []
+        for l in layers_list:
+            couches_data.append([l['z_min'], l['z_max'], l['c'], l['rho']])
+        couches = np.array(couches_data)
+    else:
+        # Aucune couche définie
+        couches = np.empty((0, 4))
 
-    couches = np.array([[30e-3,35e-3,c1,p1]])
-    impedence_i = couches[:,2]*couches[:,3]
-    impedence = p*c
+    # Ta logique de réflexion reste identique, mais on protège la boucle
+    sig_c = np.zeros(Nt, dtype=np.float32)
+
+    if couches.shape[0] > 0:
+        impedence_i = couches[:,2] * couches[:,3]
+        impedence = p*c
     coef_ref = (impedence_i - impedence) / (impedence_i + impedence)
     coef_ref = np.where(coef_ref < 0, np.abs(coef_ref),coef_ref)
     
 
 
-    #TODO ! En utilisant la methode diffuseur, chaque capteur prend en compte l'onde reflechis a chaque point de l'interface
-    # entre le milieu 1 et 2. Cella pose probleme etant donner que seul le capteur en direct resoit l'onde
 
     sig_c = np.zeros(Nt, dtype=np.float32)
     for n in range(couches.shape[0]):
@@ -175,23 +185,41 @@ def simulate_us_scene(
         sig_c += np.float32(
             att2 * np.interp(t, t_pulse + t2, pulse, left=0.0, right=0.0)
         )
-        
-
 
     rf = np.zeros((Nt, Nelem), dtype=np.float32)
     for n in range(Nelem):
+
         #Calcule de la distance sur l'axe des x 
         dx_n = xs - x_el[n]
         #Calcule de la distance radial
         Rrx  = np.sqrt(dx_n ** 2 + zs ** 2)
 
-        #Temps de propagation aller (onde plane)
+        # On initialise les temps avec la vitesse de base 
         t_tx = zs / c
-
-        #Temps de propagation retour 
         t_rx = Rrx / c
 
-        #Retard total
+        for i_layer in range(couches.shape[0]):
+            z_min_layer = couches[i_layer, 0]
+            z_max_layer = couches[i_layer, 1]
+            v_layer     = couches[i_layer, 2] # Ton c1
+
+            # Épaisseur de couche traversée par la cible (verticalement)
+            # Logique : Si la cible est après la couche, on traverse toute l'épaisseur
+            #           Si la cible est avant, on traverse 0.
+            thickness_crossed = np.maximum(0, np.minimum(zs, z_max_layer) - z_min_layer)
+
+            # Delta_t = (d / v_layer) - (d / c_eau)
+            if np.any(thickness_crossed > 0):
+                delta_tx = thickness_crossed * (1.0/v_layer - 1.0/c)
+                t_tx = t_tx + delta_tx
+
+                ratio = thickness_crossed / zs
+                dist_oblique_layer = Rrx * ratio
+                delta_rx = dist_oblique_layer * (1.0/v_layer - 1.0/c)
+                t_rx = t_rx + delta_rx
+
+
+        #Retard total (maintenant corrigé !)
         tau  = t_tx + t_rx
 
         #Attenuation en 1/R^2 avec un np.maximum pour eviter les division par zeros
