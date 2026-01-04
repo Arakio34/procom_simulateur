@@ -14,7 +14,6 @@ from beamforming import beamforming, mvdr_beamforming
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Simulateur Echographique B-Mode")
     
-    # Mise à jour : on utilise load_scene_data qui renvoie un dictionnaire complet
     parser.add_argument(
         '--json-file',
         type=load_scene_data, 

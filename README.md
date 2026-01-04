@@ -1,4 +1,4 @@
-# Simulateur Echographique B-Mode (Python)
+# Simulateur Echographique V2
 
 Ce projet est un simulateur léger d'imagerie ultrasonore (échographie) codé en Python. Il génère des données brutes RF (Radio-Frequency) et reconstitue des images B-mode.
 
@@ -84,3 +84,5 @@ Les fichiers HDF5 generes contiennent :
 - bmode_dB : Image finale en echelle logarithmique.
 - y_align : Signaux alignes (apres decalage temporel).
 - meta : Dictionnaire contenant les parametres physiques (c, fs, f0, pitch, etc.).
+
+
