@@ -9,7 +9,7 @@ Le simulateur modélise une émission en Onde Plane (Plane Wave) et permet de si
 - Simulation Physique : Modelisation de la reponse impulsionnelle, delais de vol et attenuation geometrique (1/R).
 - Beamforming Flexible :
   - DAS : Reconstruction standard "Delay-and-Sum".
-  - MVDR : Reconstruction adaptative (Capon) pour une meilleure resolution (implementation corrigee avec Diagonal Loading).
+  - MV : Reconstruction adaptative (Capon) pour une meilleure resolution (implementation corrigee avec Diagonal Loading).
 - Scenarios Personnalisables : Generation aleatoire de cibles ou chargement precis via un fichier JSON.
 - Export de Donnees : Sauvegarde des donnees brutes (RF), traitees (B-mode) et des metadonnees au format .h5 (HDF5).
 - Outils Pedagogiques : Scripts d'animation pour visualiser les phenomenes physiques (Huygens, interferences, interpolation).
@@ -84,5 +84,12 @@ Les fichiers HDF5 generes contiennent :
 - bmode_dB : Image finale en echelle logarithmique.
 - y_align : Signaux alignes (apres decalage temporel).
 - meta : Dictionnaire contenant les parametres physiques (c, fs, f0, pitch, etc.).
+
+
+## TODO 
+
+ - Creer une classe contenant tout les parametre de simulation qui sont pour l'instant hard coder dans simulation.
+ - Pouvoir donner un Json avec tout les parametre de simulation 
+ - Creer une classe Scene contenant tout les element de la scene. => Le simulateur ne prendra plus qu'un objet Scene et Parameter
 
 
