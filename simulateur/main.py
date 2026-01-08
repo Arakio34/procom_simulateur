@@ -2,6 +2,7 @@ import numpy as np
 import h5py
 import matplotlib.pyplot as plt
 from scipy.signal import hilbert
+from parameters import Parameters
 from scipy.linalg import inv, pinv
 from scipy.io import savemat
 from scipy.signal.windows import hann
@@ -14,6 +15,7 @@ from beamforming import beamforming, mvdr_beamforming
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Simulateur Echographique B-Mode")
     
+    parser.add_argument("--config", type=str, help="Lien vers parameters.json")
     parser.add_argument(
         '--json-file',
         type=load_scene_data, 
@@ -31,6 +33,12 @@ if __name__ == "__main__":
     # --- Gestion des données d'entrée (JSON vs Aléatoire) ---
     scene_data = args.json_file # Ceci est maintenant un dictionnaire ou None
     
+    if args.config:
+        with open(args.config, 'r') as f:
+            params = Parameters.from_json(json.load(f))
+    else:
+        params = Parameters(Nelem=args.nelem, SNR_dB=args.snr)
+
     if scene_data is not None:
         print(f"Chargement de la scène depuis le fichier JSON...")
         points = np.array(scene_data['points'])
@@ -73,6 +81,7 @@ if __name__ == "__main__":
 
         # Appel avec le nouvel argument layers_list
         rf = simulate_us_scene(
+            params,
             SNR_dB=args.snr,         
             Nelem=args.nelem,         
             seed=i,               
@@ -86,6 +95,7 @@ if __name__ == "__main__":
         if args.mvdr == True:
             png_path = os.path.join(img_dir, f"{filename_base}_mvdr.png")
             data = mvdr_beamforming( 
+                params,
                 rf, 
                 Nelem = args.nelem,
                 SNR_dB=args.snr,         
@@ -93,6 +103,7 @@ if __name__ == "__main__":
         else:
             png_path = os.path.join(img_dir, f"{filename_base}.png")
             data = beamforming( 
+                params,
                 rf, 
                 Nelem = args.nelem,
                 SNR_dB=args.snr,         
