@@ -40,6 +40,7 @@ def generate_bright_point(
         
 # bp List au format [[x1,z1,i1],[x2,z2,i2],...,[xn,zn,in]]
 def simulate_us_scene(
+    params,
     SNR_dB=10.0,
     Nelem=80,
     seed=None,
@@ -53,11 +54,11 @@ def simulate_us_scene(
     Retourne un dict avec rf, bmode_dB, env, meta, etc.
     """
 
-    x_span   = 20e-3
-    z_min    = 10e-3
-    z_max    = 50e-3
-    Nx       = 256
-    Nz       = 256
+    x_span   = params.x_span
+    z_min    = params.z_min
+    z_max    = params.z_max
+    Nx       = params.Nx
+    Nz       = params.Nz
     x_img    = np.linspace(-x_span / 2, x_span / 2, Nx)
     z_img    = np.linspace(z_min, z_max, Nz)
 
@@ -70,20 +71,18 @@ def simulate_us_scene(
     # ============================
     # Paramètres de base
     # ============================
-    c        = 1540.0 # Vitesse (reference corp humain) [m/s]
-    c1        = 1455.0 # Vitesse (graisse) [m/s]
-    p        = 985.0  # Masse volumique (reference corp humain) [kg/m³]
-    p1       = 900.0  # Masse volumique (graisse) [kg/m³]
-    f0       = 5e6    # Frequence  [Hz]
-    fracBW   = 0.6
-    fs       = 40e6
+    c        = params.c # Vitesse (reference corp humain) [m/s]
+    p        = params.p # Masse volumique (reference corp humain) [kg/m³]
+    f0       = params.f0  # Frequence  [Hz]
+    fracBW   = params.fracBW
+    fs       = params.fs
     lam      = c / f0
     dt       = 1.0 / fs  
 
     # ============================
     # Array
     # ============================
-    pitch    = 0.15e-3
+    pitch    = params.pitch
     aperture = (Nelem - 1) * pitch
     x_el     = np.linspace(-aperture / 2, aperture / 2, Nelem)
 
@@ -95,13 +94,11 @@ def simulate_us_scene(
     ROI_z         = np.array([z_min, z_max])
     rayleighScale = 1.0
 
-    pt_pos = np.array([0e-3, 30e-3])
-    pt_amp = 8.0
 
     # ============================
     # Pulse
     # ============================
-    nCycles = 2.5
+    nCycles = params.nCycles
     pulseT  = nCycles / f0
     t_pulse = np.arange(-pulseT, pulseT + 1.0 / fs, 1.0 / fs)
     sigma_t = pulseT / 2.355
@@ -164,8 +161,8 @@ def simulate_us_scene(
     if couches.shape[0] > 0:
         impedence_i = couches[:,2] * couches[:,3]
         impedence = p*c
-    coef_ref = (impedence_i - impedence) / (impedence_i + impedence)
-    coef_ref = np.where(coef_ref < 0, np.abs(coef_ref),coef_ref)
+        coef_ref = (impedence_i - impedence) / (impedence_i + impedence)
+        coef_ref = np.where(coef_ref < 0, np.abs(coef_ref),coef_ref)
     
 
 
@@ -200,7 +197,7 @@ def simulate_us_scene(
         for i_layer in range(couches.shape[0]):
             z_min_layer = couches[i_layer, 0]
             z_max_layer = couches[i_layer, 1]
-            v_layer     = couches[i_layer, 2] # Ton c1
+            v_layer     = couches[i_layer, 2] 
 
             # Épaisseur de couche traversée par la cible (verticalement)
             # Logique : Si la cible est après la couche, on traverse toute l'épaisseur
@@ -230,7 +227,10 @@ def simulate_us_scene(
         tau  = t_tx + t_rx
 
         #Attenuation en 1/R^2 avec un np.maximum pour eviter les division par zeros
-        att  = (1.0 / np.maximum((Rrx*(10^3))**2, 1e-3) )* att_layer
+        if couches.shape[0] > 0:
+            att  = (1.0 / np.maximum((Rrx*(10^3))**2, 1e-3) ) * att_layer
+        else :
+            att  = (1.0 / np.maximum((Rrx*(10^3))**2, 1e-3) )
 
         sig_n = np.zeros(Nt, dtype=np.float32)
 
