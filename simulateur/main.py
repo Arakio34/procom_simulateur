@@ -25,7 +25,7 @@ if __name__ == "__main__":
     parser.add_argument("--out", type=str, default="data", help="Dossier de sortie racine")
     parser.add_argument("--snr", type=float, default=15.0, help="Rapport Signal/Bruit désiré en dB.")
     parser.add_argument("--nelem", type=int, default=80, help="Nombre de capteur.")
-    parser.add_argument("--mvdr", type=bool, default=False, help="Activation du MVDR.")
+    parser.add_argument("--mvdr", action='store_true', default=False, help="Activation du MVDR.")
     parser.add_argument("--maxpoint", type=int, default=3, help="Nombre de point maximum par image (mode aléatoire).")
     
     args = parser.parse_args()
