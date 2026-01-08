@@ -83,9 +83,9 @@ def extract_pixels_from_h5_list(paths):
                 X_pixels = extract_pixel_features(rf, x_el, X, Z)
                 
                 # --- CORRECTION CIBLE ---
-                if 'bmode_dB' in f:
+                if 'target_rf' in f:
                     # bmode_dB est l'image cible (logarithmique)
-                    Y_db = f['bmode_dB'][:].reshape(-1)
+                    Y_db = f['target_rf'][:].reshape(-1)
                     # On convertit en amplitude LINEAIRE positive
                     # db = 20 * log10(amp)  => amp = 10^(db/20)
                     Y_linear = np.power(10, Y_db / 20.0)
@@ -145,6 +145,34 @@ class ABLE_MLP(nn.Module):
 # 3. Loss Modifiée (Magnitude)
 # ==========================================
 
+class SMSLELoss(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, pred_rf, target_rf, weights):
+        # Séparation des parties positives et négatives (Eq. 16 de l'article)
+        # On utilise une epsilon pour éviter log(0)
+        eps = 1e-6
+
+        # Partie Positive
+        pos_pred = torch.relu(pred_rf) + eps
+        pos_target = torch.relu(target_rf) + eps
+        loss_pos = torch.mean((torch.log10(pos_pred) - torch.log10(pos_target)) ** 2)
+
+        # Partie Négative (inversée pour passer dans le log)
+        neg_pred = torch.relu(-pred_rf) + eps
+        neg_target = torch.relu(-target_rf) + eps
+        loss_neg = torch.mean((torch.log10(neg_pred) - torch.log10(neg_target)) ** 2)
+
+        # Somme (0.5 * somme selon l'article, ou moyenne directe)
+        loss_smsle = 0.5 * (loss_pos + loss_neg)
+
+        # Unity constraint (Somme des poids ~ 1)
+        loss_unity = torch.mean((torch.sum(weights, dim=1) - 1.0) ** 2)
+
+        # Pondération (Lambda n'est pas précisé à 100% dans le papier, essayez 0.01 ou 0.1 pour unity)
+        return loss_smsle + 0.1 * loss_unity
+
 class MagnitudeLoss(nn.Module):
     def __init__(self):
         super().__init__()
@@ -192,7 +220,7 @@ def training(args):
     
     model = ABLE_MLP(N=N_elem).to(device)
     optimizer = optim.Adam(model.parameters(), lr=0.0005)
-    criterion = MagnitudeLoss()
+    criterion = SMSLELoss()
 
     for epoch in range(args.epochs):
         model.train()

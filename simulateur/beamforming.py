@@ -147,6 +147,8 @@ def mvdr_beamforming(params, rf, Nelem=80, SNR_dB=10.0, regularization=0.1):
         for ix in range(Nx):
             # Snapshot
             x_vec = y_align[:, ix, iz].reshape(-1, 1)
+        
+            rf_mvdr = np.zeros((Nz, Nx), dtype=np.float32)
             
             # Covariance R = x * x^H
             # Pour stabilité, on peut ajouter du moyennage spatial (sub-array smoothing)
@@ -173,6 +175,7 @@ def mvdr_beamforming(params, rf, Nelem=80, SNR_dB=10.0, regularization=0.1):
             
             # Application
             pixel_val = w.conj().T @ x_vec
+            rf_mvdr[iz, ix] = np.real(pixel_val)
             bmode_mvdr[iz, ix] = np.abs(pixel_val)
 
     # --- 4. Sortie ---
@@ -195,7 +198,8 @@ def mvdr_beamforming(params, rf, Nelem=80, SNR_dB=10.0, regularization=0.1):
         'x_img': x_img,
         'z_img': z_img,
         'bmode_dB': bmode_dB,
-        'env': env,  # <--- AJOUTÉ : Permet à model.py d'apprendre sans hack dB
+        'env': env,   
+        'target_rf': rf_mvdr,  
         'meta': meta,
     }
     return data
