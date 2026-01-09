@@ -1,1 +1,8 @@
 data/*
+.venv
+simulateur/.venv
+simulateur/data/*
+simulateur/__pycache__/*
+__pycache__/*
+.python-version
+.Rhistory
