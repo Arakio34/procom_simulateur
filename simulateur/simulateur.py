@@ -40,23 +40,25 @@ def generate_bright_point(
         
 # bp List au format [[x1,z1,i1],[x2,z2,i2],...,[xn,zn,in]]
 def simulate_us_scene(
+    params,
     SNR_dB=10.0,
     Nelem=80,
     seed=None,
     max_point=3,
     generate_bp=True,
-    bp_list=None
+    bp_list=None,
+    layers_list=None
 ):
     """
     Simule une image d'échographie B-mode et les RF associés.
     Retourne un dict avec rf, bmode_dB, env, meta, etc.
     """
 
-    x_span   = 20e-3
-    z_min    = 10e-3
-    z_max    = 50e-3
-    Nx       = 256
-    Nz       = 256
+    x_span   = params.x_span
+    z_min    = params.z_min
+    z_max    = params.z_max
+    Nx       = params.Nx
+    Nz       = params.Nz
     x_img    = np.linspace(-x_span / 2, x_span / 2, Nx)
     z_img    = np.linspace(z_min, z_max, Nz)
 
@@ -69,17 +71,18 @@ def simulate_us_scene(
     # ============================
     # Paramètres de base
     # ============================
-    c        = 1540.0
-    f0       = 5e6
-    fracBW   = 0.6
-    fs       = 40e6
+    c        = params.c # Vitesse (reference corp humain) [m/s]
+    p        = params.p # Masse volumique (reference corp humain) [kg/m³]
+    f0       = params.f0  # Frequence  [Hz]
+    fracBW   = params.fracBW
+    fs       = params.fs
     lam      = c / f0
     dt       = 1.0 / fs  
 
     # ============================
     # Array
     # ============================
-    pitch    = 0.15e-3
+    pitch    = params.pitch
     aperture = (Nelem - 1) * pitch
     x_el     = np.linspace(-aperture / 2, aperture / 2, Nelem)
 
@@ -91,13 +94,11 @@ def simulate_us_scene(
     ROI_z         = np.array([z_min, z_max])
     rayleighScale = 1.0
 
-    pt_pos = np.array([0e-3, 30e-3])
-    pt_amp = 8.0
 
     # ============================
     # Pulse
     # ============================
-    nCycles = 2.5
+    nCycles = params.nCycles
     pulseT  = nCycles / f0
     t_pulse = np.arange(-pulseT, pulseT + 1.0 / fs, 1.0 / fs)
     sigma_t = pulseT / 2.355
@@ -130,49 +131,125 @@ def simulate_us_scene(
     else:
         bright_points = bp_list
 
-
     xs = bright_points[:, 0]
     zs = bright_points[:, 1]
     as_ = bright_points[:, 2]
 
-    print(xs)
-    print(zs)
-    print(as_)
-
     N_scatt = as_.size
 
     # ============================
-    # Synthèse RF
+    #  Couche absorbante
     # ============================
-    rf = np.zeros((Nt, Nelem), dtype=np.float32)
 
+    #   [[zmin1,zmax2,v_1],
+    #    [zmin2,zmax2,v_2],
+    #  ...
+    #    ]
+    # avec v_i le coeficient de reflexion
+    if layers_list:
+        couches_data = []
+        for l in layers_list:
+            couches_data.append([l['z_min'], l['z_max'], l['c'], l['rho']])
+        couches = np.array(couches_data)
+    else:
+        # Aucune couche définie
+        couches = np.empty((0, 4))
+
+    # Ta logique de réflexion reste identique, mais on protège la boucle
+    sig_c = np.zeros(Nt, dtype=np.float32)
+
+    if couches.shape[0] > 0:
+        impedence_i = couches[:,2] * couches[:,3]
+        impedence = p*c
+        coef_ref = (impedence_i - impedence) / (impedence_i + impedence)
+        coef_ref = np.where(coef_ref < 0, np.abs(coef_ref),coef_ref)
+    
+
+
+
+    sig_c = np.zeros(Nt, dtype=np.float32)
+    for n in range(couches.shape[0]):
+        d1  = (couches[n,0])
+        e =(couches[n,1] - couches[n,0])
+        t1  = 2*d1 / c # Retard a la premier interface
+        t2  = t1 + e*2/couches[n,2] # Retard a la seconde interface
+        att1 = 1/np.maximum((1*d1*(10^3))**2, 1e-3) * coef_ref[n]
+        att2 = 1/np.maximum((1*(d1+e)*(10^3))**2, 1e-3) * coef_ref[n]* (1-coef_ref[n])**2
+        sig_c += np.float32(
+            att1 * np.interp(t, t_pulse + t1, pulse, left=0.0, right=0.0)
+        )
+        sig_c += np.float32(
+            att2 * np.interp(t, t_pulse + t2, pulse, left=0.0, right=0.0)
+        )
+
+    rf = np.zeros((Nt, Nelem), dtype=np.float32)
     for n in range(Nelem):
+
         #Calcule de la distance sur l'axe des x 
         dx_n = xs - x_el[n]
         #Calcule de la distance radial
         Rrx  = np.sqrt(dx_n ** 2 + zs ** 2)
-        #Temps de propagation aller (onde plane)
+
+        # On initialise les temps avec la vitesse de base 
         t_tx = zs / c
-        #Temps de propagation retour 
         t_rx = Rrx / c
-        #Retard total
+
+        for i_layer in range(couches.shape[0]):
+            z_min_layer = couches[i_layer, 0]
+            z_max_layer = couches[i_layer, 1]
+            v_layer     = couches[i_layer, 2] 
+
+            # Épaisseur de couche traversée par la cible (verticalement)
+            # Logique : Si la cible est après la couche, on traverse toute l'épaisseur
+            #           Si la cible est avant, on traverse 0.
+            thickness_crossed = np.maximum(0, np.minimum(zs, z_max_layer) - z_min_layer)
+
+            # Delta_t = (d / v_layer) - (d / c_eau)
+            if np.any(thickness_crossed > 0):
+                delta_tx = thickness_crossed * (1.0/v_layer - 1.0/c)
+                t_tx = t_tx + delta_tx
+
+                ratio = thickness_crossed / zs
+                dist_oblique_layer = Rrx * ratio
+                delta_rx = dist_oblique_layer * (1.0/v_layer - 1.0/c)
+                t_rx = t_rx + delta_rx
+
+                
+                if np.any(thickness_crossed) == (z_max_layer - z_min_layer):
+                    att_layer = coef_ref[i_layer]**2 *(1-coef_ref[i_layer])**2
+                else:
+                    att_layer= coef_ref[i_layer]*(1-coef_ref[i_layer])
+            else:
+                att_layer = 1
+
+
+        #Retard total (maintenant corrigé !)
         tau  = t_tx + t_rx
 
-        #Attenuation en 1/R avec un np.maximum pour eviter les division par zeros
-        att  = 1.0 / np.maximum(Rrx, 1e-3)
+        #Attenuation en 1/R^2 avec un np.maximum pour eviter les division par zeros
+        if couches.shape[0] > 0:
+            att  = (1.0 / np.maximum((Rrx*(10^3))**2, 1e-3) ) * att_layer
+        else :
+            att  = (1.0 / np.maximum((Rrx*(10^3))**2, 1e-3) )
 
         sig_n = np.zeros(Nt, dtype=np.float32)
 
         for k in range(N_scatt):
+
             # Retard du PB k par rapport au capteur n
             tk = tau[k]
+
             # Amplitude par rapport au niveau de reflexion [as] et a l'attenuation [att]
             ak = as_[k] * att[k]
+
             sig_n += np.float32(
                 ak * np.interp(t, t_pulse + tk, pulse, left=0.0, right=0.0)
             )
-        rf[:, n] = sig_n
+        rf[:, n] = sig_n + sig_c
 
+    plt.figure(figsize=(10,4))
+    plt.plot(t,rf[:,2])
+    plt.savefig("mong.png")
     # ============================
     # Bruit
     # ============================
