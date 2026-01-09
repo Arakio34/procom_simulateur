@@ -143,13 +143,11 @@ def mvdr_beamforming(params, rf, Nelem=80, SNR_dB=10.0, regularization=0.1):
     a = np.ones((Nelem, 1), dtype=np.complex64) # Steering vector (ones car déjà aligné)
     eye_N = np.eye(Nelem)
 
+    rf_mvdr = np.zeros((Nz, Nx), dtype=np.float32)
     for iz in range(Nz):
         for ix in range(Nx):
             # Snapshot
             x_vec = y_align[:, ix, iz].reshape(-1, 1)
-        
-            rf_mvdr = np.zeros((Nz, Nx), dtype=np.float32)
-            
             # Covariance R = x * x^H
             # Pour stabilité, on peut ajouter du moyennage spatial (sub-array smoothing)
             # Ici on reste sur du Diagonal Loading simple
