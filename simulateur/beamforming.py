@@ -4,7 +4,7 @@ from scipy.signal import hilbert
 from scipy.linalg import inv, pinv
 from scipy.signal.windows import hann
 
-def beamforming(rf, Nelem=80, SNR_dB=10.0):
+def beamforming(params, rf, Nelem=80, SNR_dB=10.0):
     """
     Beamforming DAS classique (Delay And Sum).
     """
@@ -197,6 +197,7 @@ def mvdr_beamforming(params, rf, Nelem=80, SNR_dB=10.0, regularization=0.1):
         'rf': rf,
         'x_img': x_img,
         'z_img': z_img,
+        'x_el': x_el,
         'bmode_dB': bmode_dB,
         'env': env,   
         'target_rf': rf_mvdr,  

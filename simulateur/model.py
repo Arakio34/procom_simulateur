@@ -70,6 +70,10 @@ def extract_pixels_from_h5_list(paths):
             with h5py.File(path, "r") as f:
                 rf = f["rf"][:]
                 
+                # 1. CALCUL DU MAX GLOBAL POUR CE FICHIER (AJOUT)
+                # On en a besoin pour normaliser la cible Y comme l'entrée X
+                max_val = np.max(np.abs(rf)) if np.max(np.abs(rf)) > 0 else 1.0 # <--- AJOUT IMPORTANT
+
                 if 'x_img' in f:
                     x_vec = f['x_img'][:]
                     z_vec = f['z_img'][:]
@@ -80,15 +84,18 @@ def extract_pixels_from_h5_list(paths):
                     X, Z = np.meshgrid(np.linspace(-20e-3, 20e-3, 128), np.linspace(5e-3, 50e-3, 128))
 
                 x_el = get_x_el_from_file(f, rf.shape[1])
+                
+                # X est déjà normalisé par max_val à l'intérieur de cette fonction
                 X_pixels = extract_pixel_features(rf, x_el, X, Z)
                 
-                # --- CORRECTION CIBLE ---
+                # --- CORRECTION CIBLE (MODIFICATION ICI) ---
                 if 'target_rf' in f:
-                    # bmode_dB est l'image cible (logarithmique)
-                    Y_db = f['target_rf'][:].reshape(-1)
-                    # On convertit en amplitude LINEAIRE positive
-                    # db = 20 * log10(amp)  => amp = 10^(db/20)
-                    Y_linear = np.power(10, Y_db / 20.0)
+                    # target_rf est déjà linéaire (c'est le signal RF MVDR brut)
+                    Y_raw = f['target_rf'][:].reshape(-1)
+                    
+                    # 2. SUPPRESSION DE np.power ET NORMALISATION
+                    # On divise par max_val pour que X et Y soient à la même échelle [-1, 1]
+                    Y_linear = Y_raw / max_val  # <--- CORRECTION MAJEURE
                 else:
                     Y_linear = np.zeros(X_pixels.shape[0])
 
@@ -100,7 +107,6 @@ def extract_pixels_from_h5_list(paths):
 
     if len(all_X) == 0: return torch.empty((0,0)), torch.empty((0,))
     return torch.cat(all_X, dim=0), torch.cat(all_Y, dim=0)
-
 class ABLEDataset(Dataset):
     def __init__(self, X, Y):
         self.X = X
