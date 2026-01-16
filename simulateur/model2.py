@@ -151,11 +151,11 @@ class ABLE_MLP(nn.Module):
 
         self.fc2 = nn.Linear(2 * n_elem, n_elem // 2)
         self.act2 = Antirectifier()
-        self.drop2 = nn.Dropout(0.1)
+        self.drop2 = nn.Dropout(0.2)
 
         self.fc3 = nn.Linear(n_elem, n_elem // 2)
         self.act3 = Antirectifier()
-        self.drop3 = nn.Dropout(0.1)
+        self.drop3 = nn.Dropout(0.2)
 
         self.fc4 = nn.Linear(n_elem, n_elem)
 
@@ -183,6 +183,57 @@ class MagnitudeUnityLoss(nn.Module):
         return loss_mag + self.unity_weight * loss_unity
 
 
+class SMSLELoss(nn.Module):
+    def __init__(self, eps=1e-6):
+        super().__init__()
+        self.eps = eps
+
+    def forward(self, pred, target):
+        # split positive and negative parts
+        pred_pos = torch.relu(pred)
+        pred_neg = torch.relu(-pred)
+
+        target_pos = torch.relu(target)
+        target_neg = torch.relu(-target)
+
+        # compute log mse on each
+        loss_pos = torch.mean((torch.log(pred_pos + self.eps) -
+                               torch.log(target_pos + self.eps)) ** 2)
+
+        loss_neg = torch.mean((torch.log(pred_neg + self.eps) -
+                               torch.log(target_neg + self.eps)) ** 2)
+
+        return loss_pos + loss_neg
+
+class UnityLoss(nn.Module):
+    def forward(self, weights):
+        s = torch.sum(weights, dim=1)
+        return torch.mean((s - 1.0) ** 2)
+
+class ABLELoss(nn.Module):
+    def __init__(self, lambda_unity=1):
+        super().__init__()
+        self.smsle = SMSLELoss()
+        self.unity = UnityLoss()
+        self.lambda_unity = lambda_unity
+
+    def forward(self, pred_image, target_image, weights):
+        L_img = self.smsle(pred_image, target_image)
+        L_unity = self.unity(weights)
+        return L_img + self.lambda_unity * L_unity
+
+
+class SimpleMSELoss(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.mse = nn.MSELoss()
+
+    def forward(self, pred_rf, target_mag, weights):
+
+        pred_mag = torch.abs(pred_rf)
+
+
+        return self.mse(pred_mag, target_mag)
 # ==========================================
 # 4. Entraînement & Inférence
 # ==========================================
@@ -210,7 +261,9 @@ def training(args):
 
     model = ABLE_MLP(n_elem=n_elem).to(device)
     optimizer = optim.Adam(model.parameters(), lr=0.001)
-    criterion = MagnitudeUnityLoss(unity_weight=0.05)
+    #criterion = MagnitudeUnityLoss(unity_weight=0.05)
+    #criterion = ABLELoss()
+    criterion = SimpleMSELoss()
 
     for epoch in range(args.epochs):
         model.train()
