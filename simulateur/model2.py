@@ -147,7 +147,7 @@ class ABLE_MLP(nn.Module):
         super().__init__()
         self.fc1 = nn.Linear(n_elem, n_elem)
         self.act1 = Antirectifier()
-        self.drop1 = nn.Dropout(0.1)
+        self.drop1 = nn.Dropout(0.2)
 
         self.fc2 = nn.Linear(2 * n_elem, n_elem // 2)
         self.act2 = Antirectifier()
@@ -171,7 +171,7 @@ class ABLE_MLP(nn.Module):
 # ==========================================
 
 class MagnitudeUnityLoss(nn.Module):
-    def __init__(self, unity_weight=0.05):
+    def __init__(self, unity_weight=0.3):
         super().__init__()
         self.unity_weight = unity_weight
         self.l1 = nn.L1Loss()
@@ -180,8 +180,33 @@ class MagnitudeUnityLoss(nn.Module):
         pred_mag = torch.abs(pred_rf)
         loss_mag = self.l1(pred_mag, target_mag)
         loss_unity = torch.mean((torch.sum(weights, dim=1) - 1.0) ** 2)
-        return loss_mag + self.unity_weight * loss_unity
+        return loss_mag*(1-self.unity_weight) + self.unity_weight * loss_unity #modification pour matcher la loss du papier.
+        #return loss_mag + self.unity_weight * loss_unity  # modification pour matcher la loss du papier.
 
+class MagnitudeUnityLoss_V2(nn.Module):
+    def __init__(self, unity_weight=0.3):
+        super().__init__()
+        self.unity_weight = unity_weight
+    def forward(self, pred_rf, target_mag, weights):
+        eps = 1e-7  # Pour éviter log(0)
+
+        # Séparation positif / négatif avec garde-fou
+        pred_pos = torch.clamp(pred_rf, min=eps)
+        pred_neg = torch.clamp(-pred_rf, min=eps)
+        target_pos = torch.clamp(target_mag, min=eps)
+        target_neg = torch.clamp(-target_mag, min=eps)
+
+        # Calcul des erreurs en Log (MSE stable)
+        diff_log_pos = torch.log10(target_pos) - torch.log10(pred_pos)
+        diff_log_neg = torch.log10(target_neg) - torch.log10(pred_neg)
+
+        # Utilisation de la moyenne pour que la loss soit indépendante de la taille du tenseur
+        loss_mag = 0.5 * torch.mean(diff_log_pos ** 2) + 0.5 * torch.mean(diff_log_neg ** 2)
+
+        # Loss d'unité (somme des poids = 1)
+        loss_unity = torch.mean((torch.sum(weights, dim=1) - 1.0) ** 2)
+
+        return loss_mag * (1 - self.unity_weight) + self.unity_weight * loss_unity
 
 class SMSLELoss(nn.Module):
     def __init__(self, eps=1e-6):
@@ -255,15 +280,15 @@ def training(args):
 
     dataset = ABLEDataset(x_train, y_train)
     loader = DataLoader(dataset, batch_size=4096, shuffle=True)
-
+    #loader = DataLoader(dataset, batch_size=16384, shuffle=True)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     n_elem = x_train.shape[1]
 
     model = ABLE_MLP(n_elem=n_elem).to(device)
     optimizer = optim.Adam(model.parameters(), lr=0.001)
-    #criterion = MagnitudeUnityLoss(unity_weight=0.05)
+    criterion = MagnitudeUnityLoss(unity_weight=0.3)
     #criterion = ABLELoss()
-    criterion = SimpleMSELoss()
+    #criterion = SimpleMSELoss()
 
     for epoch in range(args.epochs):
         model.train()
