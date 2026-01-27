@@ -171,7 +171,7 @@ class ABLE_MLP(nn.Module):
 # ==========================================
 
 class MagnitudeUnityLoss(nn.Module):
-    def __init__(self, unity_weight=0.3):
+    def __init__(self, unity_weight=0.5):
         super().__init__()
         self.unity_weight = unity_weight
         self.l1 = nn.L1Loss()
@@ -180,7 +180,7 @@ class MagnitudeUnityLoss(nn.Module):
         pred_mag = torch.abs(pred_rf)
         loss_mag = self.l1(pred_mag, target_mag)
         loss_unity = torch.mean((torch.sum(weights, dim=1) - 1.0) ** 2)
-        return loss_mag*(1-self.unity_weight) + self.unity_weight * loss_unity #modification pour matcher la loss du papier.
+        return 1000*(loss_mag*(1-self.unity_weight) + self.unity_weight * loss_unity) #modification pour matcher la loss du papier.
         #return loss_mag + self.unity_weight * loss_unity  # modification pour matcher la loss du papier.
 
 class MagnitudeUnityLoss_V2(nn.Module):
@@ -286,7 +286,7 @@ def training(args):
 
     model = ABLE_MLP(n_elem=n_elem).to(device)
     optimizer = optim.Adam(model.parameters(), lr=0.001)
-    criterion = MagnitudeUnityLoss(unity_weight=0.3)
+    criterion = MagnitudeUnityLoss()
     #criterion = ABLELoss()
     #criterion = SimpleMSELoss()
 
