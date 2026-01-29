@@ -10,6 +10,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset
 import matplotlib.pyplot as plt
+import time
 
 
 # ==========================================
@@ -264,6 +265,7 @@ class SimpleMSELoss(nn.Module):
 # ==========================================
 
 def training(args):
+    batch_size = 4096
     print("--- Entraînement ABLE (Mode Magnitude) ---")
     data_dir = os.path.join(args.data_dir, "h5")
 
@@ -274,13 +276,36 @@ def training(args):
     if not h5_paths:
         print("Erreur: Pas de fichiers .h5 trouvés.")
         return
+    '''
+    Rajout du dataset d'entrainement 
+    '''
+    size_dataset = len(h5_paths)
+    train_paths = h5_paths[:int(0.7*size_dataset)]
+    val_paths = h5_paths[int(0.7*size_dataset):int(0.9*size_dataset)]
+    test_paths = h5_paths[int(0.9*size_dataset):]
 
-    x_train, y_train = extract_pixels_from_h5_list(h5_paths)
+    x_train, y_train = extract_pixels_from_h5_list(train_paths)
+    x_val, y_val = extract_pixels_from_h5_list(val_paths)
+    x_test, y_test = extract_pixels_from_h5_list(test_paths)
+
+    print("Number of training files : ", len(train_paths))
+    print("Number of validation files : ", len(val_paths))
+    print("Number of testing files : ", len(test_paths))
+
     print(f"Training data shape: {x_train.shape}")
+    print(f"Validation data shape: {x_val.shape}")
+    print(f"Testing data shape: {x_test.shape}")
 
-    dataset = ABLEDataset(x_train, y_train)
-    loader = DataLoader(dataset, batch_size=4096, shuffle=True)
-    #loader = DataLoader(dataset, batch_size=16384, shuffle=True)
+    #création des différents types de dataset
+    train_dataset = ABLEDataset(x_train, y_train)
+    val_dataset = ABLEDataset(x_val,y_val)
+    test_dataset = ABLEDataset(x_test,y_test)
+
+    #création des loaders
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     n_elem = x_train.shape[1]
 
@@ -290,21 +315,47 @@ def training(args):
     #criterion = ABLELoss()
     #criterion = SimpleMSELoss()
 
+    start_training = time.time() #to evaluate the training time
     for epoch in range(args.epochs):
         model.train()
-        total_loss = 0
-        for rf, target in loader:
+        total_train_loss = 0
+        total_val_loss = 0
+        for rf, target in train_loader:
             rf, target = rf.to(device), target.to(device)
             weights = model(rf)
             pixel_pred_rf = (weights * rf).sum(dim=1)
-            loss = criterion(pixel_pred_rf, target, weights)
+            train_loss = criterion(pixel_pred_rf, target, weights)
 
             optimizer.zero_grad()
-            loss.backward()
+            train_loss.backward()
             optimizer.step()
-            total_loss += loss.item()
+            total_train_loss += train_loss.item()
 
-        print(f"Epoch {epoch + 1}/{args.epochs} | Loss: {total_loss/len(loader):.6f}")
+        print(f"Epoch {epoch + 1}/{args.epochs} | Training Loss: {total_train_loss/len(train_loader):.6f}")
+
+
+        for rf, target in val_loader :
+            rf, target = rf.to(device), target.to(device)
+            weights = model(rf)
+            pixel_pred_rf = (weights * rf).sum(dim=1)
+            val_loss = criterion(pixel_pred_rf,target, weights)
+            total_val_loss += val_loss.item()
+
+        print(f"Validation Loss: {total_val_loss/len(val_loader):.6f}")
+
+    end_training = time.time()
+    time_training = end_training - start_training
+    print(f"Time of training : {time_training:.2f} seconds")
+
+    total_test_loss = 0
+    for rf,target in test_loader :
+        rf,target = rf.to(device), target.to(device)
+        weights=model(rf)
+        pixel_pred_rf = (weights * rf).sum(dim=1)
+        test_loss = criterion(pixel_pred_rf, target, weights)
+        total_test_loss += test_loss.item()
+
+    print(f"Test Loss : {total_test_loss/len(test_loader):.6f}")
 
     os.makedirs("weight", exist_ok=True)
     torch.save({"state_dict": model.state_dict(), "N_elem": n_elem}, "weight/able_model.pth")
@@ -329,8 +380,10 @@ def beamforming(args):
     os.makedirs(out_dir, exist_ok=True)
 
     h5_paths = sorted(glob.glob(os.path.join(data_dir, "*.h5")))
+    size_dataset = len(h5_paths)
+    test_paths = h5_paths[int(0.9*size_dataset):]
 
-    for path in h5_paths:
+    for path in test_paths:
         with h5py.File(path, "r") as f:
             rf = f["rf"][:]
             rf_max = np.max(np.abs(rf)) if np.max(np.abs(rf)) > 0 else 1.0
