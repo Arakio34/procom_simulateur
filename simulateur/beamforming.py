@@ -86,7 +86,7 @@ def beamforming(params, rf, Nelem=80, SNR_dB=10.0):
         'x_img': x_img,
         'z_img': z_img,
         'bmode_dB': bmode_dB,
-        'env': env, # <--- Cible linéaire pour ABLE
+        'env': env, 
         'meta': meta,
     }
     return data

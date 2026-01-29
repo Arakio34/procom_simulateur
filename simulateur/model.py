@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.signal import hilbert
 import h5py
 import torch
 import torch.nn as nn
@@ -92,10 +93,7 @@ def extract_pixels_from_h5_list(paths):
                 if 'target_rf' in f:
                     # target_rf est déjà linéaire (c'est le signal RF MVDR brut)
                     Y_raw = f['target_rf'][:].reshape(-1)
-                    
-                    # 2. SUPPRESSION DE np.power ET NORMALISATION
-                    # On divise par max_val pour que X et Y soient à la même échelle [-1, 1]
-                    Y_linear = Y_raw / max_val  # <--- CORRECTION MAJEURE
+                    Y_linear = Y_raw / max_val  # 
                 else:
                     Y_linear = np.zeros(X_pixels.shape[0])
 
@@ -304,12 +302,10 @@ def beamforming(args):
                 # On récupère le signal RF beamformé
                 rf_sum = (weights * inp).sum(dim=1).cpu().numpy()
             
-            # Post-traitement: Enveloppe (Abs) -> Log -> Image
-            # Note: Comme on n'a pas la dimension temps pour Hilbert ici, on prend Abs
-            env = np.abs(rf_sum)
-            env = env.reshape(len(z_vec), len(x_vec))
-            
-            # Log compression
+            rf_img = rf_sum.reshape(len(z_vec), len(x_vec))
+
+            analytic_signal = hilbert(rf_img, axis=0)
+            env = np.abs(analytic_signal)
             img_db = 20 * np.log10(env + 1e-12)
             img_db = img_db - np.max(img_db) # Normalize 0 dB max
             
