@@ -1,23 +1,22 @@
 import numpy as np
-import h5py
 from scipy.signal import hilbert
-from scipy.linalg import inv, pinv
 from scipy.signal.windows import hann
 
-def beamforming(params, rf, Nelem=80, SNR_dB=10.0):
+def beamforming(params, rf, nelem=None, snr_db=None):
     """
     Beamforming DAS classique (Delay And Sum).
     """
-    c        = 1540.0
-    f0       = 5e6
-    fs       = 40e6
-    
-    x_span   = 20e-3
-    z_min    = 10e-3
-    z_max    = 50e-3
-    Nx       = 256
-    Nz       = 256
-    
+    c = params.c
+    f0 = params.f0
+    fs = params.fs
+    x_span = params.x_span
+    z_min = params.z_min
+    z_max = params.z_max
+    Nx = params.Nx
+    Nz = params.Nz
+    Nelem = params.Nelem if nelem is None else nelem
+    SNR_dB = params.SNR_dB if snr_db is None else snr_db
+
     x_img    = np.linspace(-x_span / 2, x_span / 2, Nx)
     z_img    = np.linspace(z_min, z_max, Nz)
     
@@ -27,7 +26,7 @@ def beamforming(params, rf, Nelem=80, SNR_dB=10.0):
     bmode_lin = np.zeros((Nz, Nx), dtype=np.float32)
     y_align   = np.zeros((Nelem, Nx, Nz), dtype=np.float32)
 
-    pitch    = 0.15e-3
+    pitch = params.pitch
     aperture = (Nelem - 1) * pitch
     x_el     = np.linspace(-aperture / 2, aperture / 2, Nelem)
 
@@ -75,8 +74,15 @@ def beamforming(params, rf, Nelem=80, SNR_dB=10.0):
     bmode_dB = 20 * np.log10(env + eps)
 
     meta = {
-        'c': c, 'f0': f0, 'fs': fs, 'Nelem': Nelem, 'pitch': pitch,
-        'x_el': x_el, 'x_img': x_img, 'z_img': z_img, 'SNR_dB': SNR_dB,
+        'c': c,
+        'f0': f0,
+        'fs': fs,
+        'Nelem': Nelem,
+        'pitch': pitch,
+        'x_el': x_el,
+        'x_img': x_img,
+        'z_img': z_img,
+        'SNR_dB': SNR_dB,
     }
 
     data = {
@@ -92,12 +98,16 @@ def beamforming(params, rf, Nelem=80, SNR_dB=10.0):
     return data
 
 
-def mvdr_beamforming(params, rf, Nelem=80, SNR_dB=10.0, regularization=0.1):
+def mvdr_beamforming(params, rf, nelem=None, snr_db=None, regularization=0.1):
     """
     Implémentation MVDR/Capon optimisée pour la génération de dataset.
     """
-    c, f0, fs = 1540.0, 5e6, 40e6
-    x_span, z_min, z_max = 20e-3, 10e-3, 50e-3
+    c = params.c
+    f0 = params.f0
+    fs = params.fs
+    x_span = params.x_span
+    z_min = params.z_min
+    z_max = params.z_max
     
     # Résolution augmentée pour l'entraînement (128x128)
     # 64x64 est trop flou pour apprendre des détails fins
@@ -109,12 +119,13 @@ def mvdr_beamforming(params, rf, Nelem=80, SNR_dB=10.0, regularization=0.1):
     # --- 1. Signal Analytique (Hilbert) ---
     rf_analytic = hilbert(rf, axis=0) 
 
-    bmode_mvdr = np.zeros((Nz, Nx), dtype=np.float32)
-    y_align   = np.zeros((Nelem, Nx, Nz), dtype=np.complex64)
-
-    pitch    = 0.15e-3
+    Nelem = params.Nelem if nelem is None else nelem
+    SNR_dB = params.SNR_dB if snr_db is None else snr_db
+    pitch = params.pitch
     aperture = (Nelem - 1) * pitch
     x_el     = np.linspace(-aperture / 2, aperture / 2, Nelem)
+    bmode_mvdr = np.zeros((Nz, Nx), dtype=np.float32)
+    y_align   = np.zeros((Nelem, Nx, Nz), dtype=np.complex64)
 
     # Axe temporel
     z_max_toa = z_max / c
@@ -187,8 +198,14 @@ def mvdr_beamforming(params, rf, Nelem=80, SNR_dB=10.0, regularization=0.1):
     bmode_dB = 20 * np.log10(env + 1e-12)
 
     meta = {
-        'c': c, 'f0': f0, 'fs': fs, 'Nelem': Nelem,
-        'pitch': pitch, 'x_img': x_img, 'z_img': z_img,
+        'c': c,
+        'f0': f0,
+        'fs': fs,
+        'Nelem': Nelem,
+        'pitch': pitch,
+        'x_img': x_img,
+        'z_img': z_img,
+        'SNR_dB': SNR_dB,
     }
 
     data = {
