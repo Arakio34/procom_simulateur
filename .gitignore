@@ -5,4 +5,5 @@ simulateur/data/*
 simulateur/__pycache__/*
 __pycache__/*
 .python-version
-.Rhistory
+.Rhistory.idea/
+.DS_Store
