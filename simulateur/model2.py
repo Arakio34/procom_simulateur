@@ -100,23 +100,23 @@ def extract_pixels_from_h5_list(paths, max_pixels_per_file=65536):
                 x_pixels = x_pixels / rf_max
 
                 if "target_rf" in f:
-                    target_rf = f["target_rf"][:].reshape(-1)
+                    target_rf = f["target_rf"][:].reshape(128,128) #on redimensionne désormais pour avoir le format d'une image
                     y_target = np.abs(target_rf) / rf_max
                 else:
-                    y_target = np.zeros(x_pixels.shape[0], dtype=np.float32)
+                    y_target = np.zeros((128,128), dtype=np.float32)
 
-                x_pixels, y_target = _sample_pixels(
-                    x_pixels, y_target, max_pixels=max_pixels_per_file, rng=rng
-                )
-
-                all_x.append(torch.tensor(x_pixels, dtype=torch.float32))
-                all_y.append(torch.tensor(y_target, dtype=torch.float32))
+              #  x_pixels, y_target = _sample_pixels(
+              #      x_pixels, y_target, max_pixels=max_pixels_per_file, rng=rng
+               # ) on enlève sample_pixels car plus besoin
+                #On transforme et en tenseur et on change l'ordre des axes. On avait les channels en dernier sauf que pour CNN on les veut en premier.
+                all_x.append(torch.tensor(x_pixels, dtype=torch.float32).permute(2,0,1))
+                all_y.append(torch.tensor(y_target, dtype=torch.float32).permute(2,0,1))
         except Exception as e:
             print(f"Skipping {path}: {e}")
 
     if len(all_x) == 0:
         return torch.empty((0, 0)), torch.empty((0,))
-    return torch.cat(all_x, dim=0), torch.cat(all_y, dim=0)
+    return torch.stack(all_x), torch.stack(all_y) #all_x devient un tenseur de dimension (nb images, nb channel, nb_pixels_x, nb_pixels_y)
 
 
 class ABLEDataset(Dataset):
@@ -164,6 +164,29 @@ class ABLE_MLP(nn.Module):
         x = self.drop2(self.act2(self.fc2(x)))
         x = self.drop3(self.act3(self.fc3(x)))
         return self.fc4(x)
+
+    class ABLE_CNN(nn.Module):
+        def __init__(self, n_elem):
+            super().__init__()
+            self.conv1 = nn.Conv2d(n_elem, n_elem, kernel_size=3, padding=1)
+            self.act1 = Antirectifier()
+            self.drop1 = nn.Dropout2d(0.1)
+
+            self.conv2 = nn.Conv2d(2*n_elem, n_elem//2, kernel_size=3, padding=1)
+            self.act2 = Antirectifier()
+            self.drop2 = nn.Dropout2d(0.1)
+
+            self.conv3 = nn.Conv2d(n_elem, n_elem//2, kernel_size=3, padding=1)
+            self.act3 = Antirectifier()
+            self.drop3 = nn.Dropout2d(0.1)
+
+            self.conv4 = nn.Conv2d(n_elem, n_elem, kernel_size=3, padding=1)
+
+        def forward(self, x):
+            x = self.drop1(self.act1(self.conv1(x)))
+            x = self.drop2(self.act2(self.conv2(x)))
+            x = self.drop3(self.act3(self.conv3(x)))
+            return self.conv4(x)
 
 
 # ==========================================
