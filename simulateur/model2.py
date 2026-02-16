@@ -166,6 +166,75 @@ class ABLE_MLP(nn.Module):
         x = self.drop3(self.act3(self.fc3(x)))
         return self.fc4(x)
 
+#Ajout de 2 couches dans le MLP
+class ABLE_MLP_2(nn.Module):
+    def __init__(self, n_elem):
+            super().__init__()
+            self.fc1 = nn.Linear(n_elem, n_elem)
+            self.act1 = Antirectifier()
+            self.drop1 = nn.Dropout(0.2)
+
+            self.fc2 = nn.Linear(2 * n_elem, n_elem // 2)
+            self.act2 = Antirectifier()
+            self.drop2 = nn.Dropout(0.2)
+
+            self.fc3 = nn.Linear(n_elem, n_elem // 2)
+            self.act3 = Antirectifier()
+            self.drop3 = nn.Dropout(0.2)
+
+            self.fc4 = nn.Linear(n_elem, n_elem // 2)
+            self.act4 = Antirectifier()
+            self.drop4 = nn.Dropout(0.2)
+
+            self.fc5 = nn.Linear(n_elem, n_elem // 2)
+            self.act5 = Antirectifier()
+            self.drop5 = nn.Dropout(0.2)
+
+            self.fc6 = nn.Linear(n_elem, n_elem)
+
+
+    def forward(self, x):
+        x = self.drop1(self.act1(self.fc1(x)))
+        x = self.drop2(self.act2(self.fc2(x)))
+        x = self.drop3(self.act3(self.fc3(x)))
+        x = self.drop4(self.act4(self.fc4(x)))
+        x = self.drop5(self.act5(self.fc5(x)))
+        return self.fc6(x)
+
+#Ajout de 2 couches dans le MLP
+class ABLE_CNN(nn.Module):
+    def __init__(self, n_elem):
+            super().__init__()
+            self.fc1 = nn.Linear(n_elem, n_elem)
+            self.act1 = Antirectifier()
+            self.drop1 = nn.Dropout(0.2)
+
+            self.fc2 = nn.Linear(2 * n_elem, n_elem // 2)
+            self.act2 = Antirectifier()
+            self.drop2 = nn.Dropout(0.2)
+
+            self.fc3 = nn.Linear(n_elem, n_elem // 2)
+            self.act3 = Antirectifier()
+            self.drop3 = nn.Dropout(0.2)
+
+            self.fc4 = nn.Linear(n_elem, n_elem // 2)
+            self.act4 = Antirectifier()
+            self.drop4 = nn.Dropout(0.2)
+
+            self.fc5 = nn.Linear(n_elem, n_elem // 2)
+            self.act5 = Antirectifier()
+            self.drop5 = nn.Dropout(0.2)
+
+            self.fc6 = nn.Linear(n_elem, n_elem)
+
+
+    def forward(self, x):
+        x = self.drop1(self.act1(self.fc1(x)))
+        x = self.drop2(self.act2(self.fc2(x)))
+        x = self.drop3(self.act3(self.fc3(x)))
+        x = self.drop4(self.act4(self.fc4(x)))
+        x = self.drop5(self.act5(self.fc5(x)))
+        return self.fc6(x)
 
 # ==========================================
 # 3. Loss (Magnitude + Unity)
@@ -309,7 +378,8 @@ def training(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     n_elem = x_train.shape[1]
 
-    model = ABLE_MLP(n_elem=n_elem).to(device)
+    #model = ABLE_MLP(n_elem=n_elem).to(device)
+    model = ABLE_MLP_2(n_elem=n_elem).to(device)
     optimizer = optim.Adam(model.parameters(), lr=0.001)
     criterion = MagnitudeUnityLoss()
     #criterion = ABLELoss()
@@ -333,7 +403,7 @@ def training(args):
 
         print(f"Epoch {epoch + 1}/{args.epochs} | Training Loss: {total_train_loss/len(train_loader):.6f}")
 
-
+        model.eval()
         for rf, target in val_loader :
             rf, target = rf.to(device), target.to(device)
             weights = model(rf)
@@ -371,7 +441,8 @@ def beamforming(args):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     ckpt = torch.load(model_path, map_location=device)
-    model = ABLE_MLP(n_elem=ckpt["N_elem"]).to(device)
+    #model = ABLE_MLP(n_elem=ckpt["N_elem"]).to(device)
+    model = ABLE_MLP_2(n_elem=ckpt["N_elem"]).to(device)
     model.load_state_dict(ckpt["state_dict"])
     model.eval()
 
