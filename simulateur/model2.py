@@ -98,7 +98,7 @@ def extract_pixels_from_h5_list(paths, max_pixels_per_file=65536):
                 x_el = get_x_el_from_file(f, rf.shape[1])
                 x_pixels = extract_pixel_features(rf, x_el, x_grid, z_grid)
                 x_pixels = x_pixels / rf_max
-
+               # print(f"DEBUG: x_pixels shape = {x_pixels.shape}")
                 if "target_rf" in f:
                     target_rf = f["target_rf"][:].reshape(128,128) #on redimensionne désormais pour avoir le format d'une image
                     y_target = np.abs(target_rf) / rf_max
@@ -109,8 +109,8 @@ def extract_pixels_from_h5_list(paths, max_pixels_per_file=65536):
               #      x_pixels, y_target, max_pixels=max_pixels_per_file, rng=rng
                # ) on enlève sample_pixels car plus besoin
                 #On transforme et en tenseur et on change l'ordre des axes. On avait les channels en dernier sauf que pour CNN on les veut en premier.
-                all_x.append(torch.tensor(x_pixels, dtype=torch.float32).permute(2,0,1))
-                all_y.append(torch.tensor(y_target, dtype=torch.float32).permute(2,0,1))
+                all_x.append(torch.tensor(x_pixels, dtype=torch.float32).view(128,128,80).permute(2,0,1))
+                all_y.append(torch.tensor(y_target, dtype=torch.float32).unsqueeze(0))
         except Exception as e:
             print(f"Skipping {path}: {e}")
 
@@ -165,45 +165,48 @@ class ABLE_MLP(nn.Module):
         x = self.drop3(self.act3(self.fc3(x)))
         return self.fc4(x)
 
-    class ABLE_CNN(nn.Module):
-        def __init__(self, n_elem):
-            super().__init__()
-            self.conv1 = nn.Conv2d(n_elem, n_elem, kernel_size=3, padding=1)
-            self.act1 = Antirectifier()
-            self.drop1 = nn.Dropout2d(0.1)
+class ABLE_CNN(nn.Module):
+    def __init__(self, n_elem):
+        super().__init__()
+        self.conv1 = nn.Conv2d(n_elem, n_elem, kernel_size=3, padding=1)
+        self.act1 = Antirectifier()
+        self.drop1 = nn.Dropout2d(0.1)
 
-            self.conv2 = nn.Conv2d(2*n_elem, n_elem//2, kernel_size=3, padding=1)
-            self.act2 = Antirectifier()
-            self.drop2 = nn.Dropout2d(0.1)
+        self.conv2 = nn.Conv2d(2*n_elem, n_elem//2, kernel_size=3, padding=1)
+        self.act2 = Antirectifier()
+        self.drop2 = nn.Dropout2d(0.1)
 
-            self.conv3 = nn.Conv2d(n_elem, n_elem//2, kernel_size=3, padding=1)
-            self.act3 = Antirectifier()
-            self.drop3 = nn.Dropout2d(0.1)
+        self.conv3 = nn.Conv2d(n_elem, n_elem//2, kernel_size=3, padding=1)
+        self.act3 = Antirectifier()
+        self.drop3 = nn.Dropout2d(0.1)
 
-            self.conv4 = nn.Conv2d(n_elem, n_elem, kernel_size=3, padding=1)
+        self.conv4 = nn.Conv2d(n_elem, n_elem, kernel_size=3, padding=1)
 
-        def forward(self, x):
-            x = self.drop1(self.act1(self.conv1(x)))
-            x = self.drop2(self.act2(self.conv2(x)))
-            x = self.drop3(self.act3(self.conv3(x)))
-            return self.conv4(x)
+    def forward(self, x):
+         x = self.drop1(self.act1(self.conv1(x)))
+         x = self.drop2(self.act2(self.conv2(x)))
+         x = self.drop3(self.act3(self.conv3(x)))
+         return self.conv4(x)
 
 
 # ==========================================
 # 3. Loss (Magnitude + Unity)
 # ==========================================
 
+
+
 class MagnitudeUnityLoss(nn.Module):
-    def __init__(self, unity_weight=0.05):
+    def __init__(self, unity_weight=0.5):
         super().__init__()
         self.unity_weight = unity_weight
         self.l1 = nn.L1Loss()
 
-    def forward(self, pred_rf, target_mag, weights):
-        pred_mag = torch.abs(pred_rf)
+    def forward(self, pred_mag, target_mag, weights):
+        pred_mag = torch.abs(pred_mag)
         loss_mag = self.l1(pred_mag, target_mag)
+
         loss_unity = torch.mean((torch.sum(weights, dim=1) - 1.0) ** 2)
-        return loss_mag + self.unity_weight * loss_unity
+        return 1000*(loss_mag*(1-self.unity_weight) + self.unity_weight * loss_unity)
 
 
 # ==========================================
@@ -226,12 +229,13 @@ def training(args):
     print(f"Training data shape: {x_train.shape}")
 
     dataset = ABLEDataset(x_train, y_train)
-    loader = DataLoader(dataset, batch_size=4096, shuffle=True)
+    loader = DataLoader(dataset, batch_size=2, shuffle=True)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     n_elem = x_train.shape[1]
 
-    model = ABLE_MLP(n_elem=n_elem).to(device)
+    #model = ABLE_MLP(n_elem=n_elem).to(device)
+    model = ABLE_CNN(n_elem).to(device)
     optimizer = optim.Adam(model.parameters(), lr=0.001)
     criterion = MagnitudeUnityLoss(unity_weight=0.05)
 
@@ -241,7 +245,7 @@ def training(args):
         for rf, target in loader:
             rf, target = rf.to(device), target.to(device)
             weights = model(rf)
-            pixel_pred_rf = (weights * rf).sum(dim=1)
+            pixel_pred_rf = (weights * rf).sum(dim=1, keepdim=True)
             loss = criterion(pixel_pred_rf, target, weights)
 
             optimizer.zero_grad()
@@ -265,7 +269,7 @@ def beamforming(args):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     ckpt = torch.load(model_path, map_location=device)
-    model = ABLE_MLP(n_elem=ckpt["N_elem"]).to(device)
+    model = ABLE_CNN(n_elem=ckpt["N_elem"]).to(device)
     model.load_state_dict(ckpt["state_dict"])
     model.eval()
 
@@ -296,7 +300,8 @@ def beamforming(args):
             x_pixels = extract_pixel_features(rf, x_el, x_grid, z_grid)
             x_pixels = x_pixels / rf_max
 
-            inp = torch.tensor(x_pixels, dtype=torch.float32).to(device)
+            inp = torch.tensor(x_pixels, dtype=torch.float32).view(128, 128, 80).permute(2, 0, 1)
+            inp = inp.unsqueeze(0).to(device)
 
             with torch.no_grad():
                 weights = model(inp)
