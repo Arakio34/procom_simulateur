@@ -6,6 +6,8 @@
   <component name="ChangeListManager">
     <list default="true" id="9c325f4a-bc19-4d00-a943-454f5480aa93" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/simulateur/mong.png" beforeDir="false" afterPath="$PROJECT_DIR$/simulateur/mong.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/simulateur/weight/able_model.pth" beforeDir="false" afterPath="$PROJECT_DIR$/simulateur/weight/able_model.pth" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
