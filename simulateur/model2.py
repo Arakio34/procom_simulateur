@@ -10,7 +10,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset
 import matplotlib.pyplot as plt
-
+from pytorch_msssim import ssim
 
 # ==========================================
 # 1. Pré-traitement & Chargement
@@ -189,10 +189,39 @@ class ABLE_CNN(nn.Module):
          return self.conv4(x)
 
 
+class ABLE_CNN_2(nn.Module):
+    def __init__(self, n_elem):
+        super().__init__()
+        self.conv1 = nn.Conv2d(n_elem, 64, kernel_size=3, padding=1)
+        self.act1 = Antirectifier()
+        self.drop1 = nn.Dropout2d(0.1)
+
+        self.conv2 = nn.Conv2d(128, 64, kernel_size=3, padding=1)
+        self.act2 = Antirectifier()
+        self.drop2 = nn.Dropout2d(0.1)
+
+        self.conv3 = nn.Conv2d(128, 64, kernel_size=3, padding=1)
+        self.act3 = Antirectifier()
+        self.drop3 = nn.Dropout2d(0.1)
+
+        self.conv4 = nn.Conv2d(128, n_elem, kernel_size=3, padding=1)
+
+    def forward(self, x):
+        x1 = self.drop1(self.act1(self.conv1(x)))
+
+
+        x2 = self.drop2(self.act2(self.conv2(x1)))
+        x2 = x2 + x1
+
+        x3 = self.drop3(self.act3(self.conv3(x2)))
+        x3 = x3 + x2
+
+        return self.conv4(x3)
+
+
 # ==========================================
 # 3. Loss (Magnitude + Unity)
 # ==========================================
-
 
 
 class MagnitudeUnityLoss(nn.Module):
@@ -201,14 +230,33 @@ class MagnitudeUnityLoss(nn.Module):
         self.unity_weight = unity_weight
         self.l1 = nn.L1Loss()
 
-    def forward(self, pred_mag, target_mag, weights):
-        pred_mag = torch.abs(pred_mag)
-        loss_mag = self.l1(pred_mag, target_mag)
+    def forward(self, pred_img, target_img, weights):
+        pred_img = torch.abs(pred_img)
+        loss_mag = self.l1(pred_img, target_img)
 
         loss_unity = torch.mean((torch.sum(weights, dim=1) - 1.0) ** 2)
         return 1000*(loss_mag*(1-self.unity_weight) + self.unity_weight * loss_unity)
 
 
+
+class ImageABLELoss(nn.Module):
+    def __init__(self, unity_weight=0.5, ssim_weight=0.5):
+        super().__init__()
+        self.unity_weight = unity_weight
+        self.ssim_weight = ssim_weight
+        self.l1 = nn.L1Loss()
+
+    def forward(self, pred_mag, target_mag, weights):
+
+        loss_l1 = self.l1(pred_mag, target_mag)
+
+        loss_ssim = 1 - ssim(pred_mag, target_mag, data_range=1.0, size_average=True)
+
+        unit_sum = torch.sum(weights, dim=1)
+        loss_unity = torch.mean((unit_sum - 1.0) ** 2)
+        total_loss = (1 - self.ssim_weight) * loss_l1 + self.ssim_weight * loss_ssim
+
+        return 100 * (total_loss + self.unity_weight * loss_unity)
 # ==========================================
 # 4. Entraînement & Inférence
 # ==========================================
@@ -227,7 +275,6 @@ def training(args):
 
     x_train, y_train = extract_pixels_from_h5_list(h5_paths)
     print(f"Training data shape: {x_train.shape}")
-
     dataset = ABLEDataset(x_train, y_train)
     loader = DataLoader(dataset, batch_size=2, shuffle=True)
 
@@ -235,18 +282,25 @@ def training(args):
     n_elem = x_train.shape[1]
 
     #model = ABLE_MLP(n_elem=n_elem).to(device)
-    model = ABLE_CNN(n_elem).to(device)
+    model = ABLE_CNN_2(n_elem).to(device)
     optimizer = optim.Adam(model.parameters(), lr=0.001)
-    criterion = MagnitudeUnityLoss(unity_weight=0.05)
+   # criterion = MagnitudeUnityLoss(unity_weight=0.05)
+    criterion = ImageABLELoss(unity_weight=0.5, ssim_weight=0.5)
 
     for epoch in range(args.epochs):
         model.train()
         total_loss = 0
         for rf, target in loader:
+           # print("rf shape ", rf.shape)
             rf, target = rf.to(device), target.to(device)
             weights = model(rf)
+           # print("weights shape : " ,weights.shape)
             pixel_pred_rf = (weights * rf).sum(dim=1, keepdim=True)
-            loss = criterion(pixel_pred_rf, target, weights)
+           # print("Pixel_pred_shape : ", pixel_pred_rf.shape)
+           # loss = criterion(pixel_pred_rf, target, weights)
+            pred_mag = torch.abs(pixel_pred_rf)
+
+            loss = criterion(pred_mag, target, weights)
 
             optimizer.zero_grad()
             loss.backward()
@@ -269,7 +323,7 @@ def beamforming(args):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     ckpt = torch.load(model_path, map_location=device)
-    model = ABLE_CNN(n_elem=ckpt["N_elem"]).to(device)
+    model = ABLE_CNN_2(n_elem=ckpt["N_elem"]).to(device)
     model.load_state_dict(ckpt["state_dict"])
     model.eval()
 
