@@ -54,3 +54,7 @@ Le simulateur est deterministe: a scene/parametres identiques et seed identique,
 ## Notes
 - Les anciens fichiers legacy (`beamforming.py`, `simulateur.py`, `parameters.py`, `utils.py`, `model.py`, `model2.py`) ont ete retires.
 - Les erreurs de validation sont affichees proprement sans stacktrace.
+
+## Licence
+Ce projet est distribue sous licence MIT.
+Voir `LICENSE`.
