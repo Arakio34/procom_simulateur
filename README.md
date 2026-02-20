@@ -10,14 +10,14 @@ Ce depot expose un simulateur B-mode avec une CLI legere. Le coeur est dans `cor
 Exemples:
 
 - Simulation a partir d'une scene JSON:
-  - `python main.py --scene sample/scene.json --out data`
+  - `python main.py --scene scene/scene.json --out data`
 - Simulation avec parametres explicites:
   - `python main.py --config parameters/parameters1.json --out data`
 - Activer MVDR:
-  - `python main.py --scene sample/scene.json --mvdr`
+  - `python main.py --scene scene/scene.json --mvdr`
 
 La commande `simulate` est implicite. Vous pouvez aussi l'ecrire explicitement:
-- `python main.py simulate --scene sample/scene.json --out data`
+- `python main.py simulate --scene scene/scene.json --out data`
 
 ## Options principales
 - `--scene` / `--json-file`: chemin vers une scene JSON (points/couches).
@@ -47,10 +47,10 @@ Le simulateur est deterministe: a scene/parametres identiques et seed identique,
 - Generer 5 images aleatoires, seed 42:
   - `python main.py --num 5 --seed 42 --out data`
 - Valider un fichier de scene sans lancer la simu:
-  - `python main.py --scene sample/scene.json --dry-run`
+  - `python main.py --scene scene/scene.json --dry-run`
 - Afficher le resume d'une scene:
-  - `python main.py --scene sample/scene.json --preview-scene`
+  - `python main.py --scene scene/scene.json --preview-scene`
 
 ## Notes
-- `model.py` et `model2.py` ne font pas partie de la CLI.
+- Les anciens fichiers legacy (`beamforming.py`, `simulateur.py`, `parameters.py`, `utils.py`, `model.py`, `model2.py`) ont ete retires.
 - Les erreurs de validation sont affichees proprement sans stacktrace.

@@ -40,3 +40,6 @@
 ## Configuration & Data Tips
 - Use `parameters/parameters1.json` as a starting point for tuning simulation parameters.
 - Keep large generated outputs out of the repo unless explicitly requested.
+
+## Startup Context
+- At the beginning of each new run/session, read the files in `rapport/` to take prior project reports into account before making changes.
