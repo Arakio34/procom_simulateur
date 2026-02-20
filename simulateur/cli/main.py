@@ -2,13 +2,14 @@ import argparse
 import os
 import sys
 
-from beamforming import beamforming, mvdr_beamforming
 from core import (
     Parameters,
     Scene,
     ValidationError,
+    beamforming,
     build_run_manifest,
     ensure_seed,
+    mvdr_beamforming,
     prepare_output_dirs,
     save_h5,
     save_image,
