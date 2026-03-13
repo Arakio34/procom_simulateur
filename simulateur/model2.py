@@ -351,7 +351,8 @@ def training(args):
     size_dataset = len(h5_paths)
     train_paths = h5_paths[:int(0.7*size_dataset)]
     val_paths = h5_paths[int(0.7*size_dataset):int(0.9*size_dataset)]
-    test_paths = h5_paths[int(0.9*size_dataset):]
+    #test_paths = h5_paths[int(0.9*size_dataset):]
+    test_paths = h5_paths[:]
 
     x_train, y_train = extract_pixels_from_h5_list(train_paths)
     x_val, y_val = extract_pixels_from_h5_list(val_paths)
@@ -378,8 +379,8 @@ def training(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     n_elem = x_train.shape[1]
 
-    #model = ABLE_MLP(n_elem=n_elem).to(device)
-    model = ABLE_MLP_2(n_elem=n_elem).to(device)
+    model = ABLE_MLP(n_elem=n_elem).to(device)
+    #model = ABLE_MLP_2(n_elem=n_elem).to(device)
     optimizer = optim.Adam(model.parameters(), lr=0.001)
     criterion = MagnitudeUnityLoss()
     #criterion = ABLELoss()
@@ -441,8 +442,8 @@ def beamforming(args):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     ckpt = torch.load(model_path, map_location=device)
-    #model = ABLE_MLP(n_elem=ckpt["N_elem"]).to(device)
-    model = ABLE_MLP_2(n_elem=ckpt["N_elem"]).to(device)
+    model = ABLE_MLP(n_elem=ckpt["N_elem"]).to(device)
+    #model = ABLE_MLP_2(n_elem=ckpt["N_elem"]).to(device)
     model.load_state_dict(ckpt["state_dict"])
     model.eval()
 
@@ -452,7 +453,8 @@ def beamforming(args):
 
     h5_paths = sorted(glob.glob(os.path.join(data_dir, "*.h5")))
     size_dataset = len(h5_paths)
-    test_paths = h5_paths[int(0.9*size_dataset):]
+    #test_paths = h5_paths[int(0.9*size_dataset):]
+    test_paths = h5_paths[:]
 
     for path in test_paths:
         with h5py.File(path, "r") as f:
