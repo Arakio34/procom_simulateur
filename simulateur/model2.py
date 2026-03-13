@@ -250,30 +250,25 @@ class MagnitudeUnityLoss(nn.Module):
         pred_mag = torch.abs(pred_rf)
         loss_mag = self.l1(pred_mag, target_mag)
         loss_unity = torch.mean((torch.sum(weights, dim=1) - 1.0) ** 2)
-        return 1000*(loss_mag*(1-self.unity_weight) + self.unity_weight * loss_unity) #modification pour matcher la loss du papier.
-        #return loss_mag + self.unity_weight * loss_unity  # modification pour matcher la loss du papier.
+        return 1000*(loss_mag*(1-self.unity_weight) + self.unity_weight * loss_unity)
 
 class MagnitudeUnityLoss_V2(nn.Module):
     def __init__(self, unity_weight=0.3):
         super().__init__()
         self.unity_weight = unity_weight
     def forward(self, pred_rf, target_mag, weights):
-        eps = 1e-7  # Pour éviter log(0)
+        eps = 1e-7
 
-        # Séparation positif / négatif avec garde-fou
         pred_pos = torch.clamp(pred_rf, min=eps)
         pred_neg = torch.clamp(-pred_rf, min=eps)
         target_pos = torch.clamp(target_mag, min=eps)
         target_neg = torch.clamp(-target_mag, min=eps)
 
-        # Calcul des erreurs en Log (MSE stable)
         diff_log_pos = torch.log10(target_pos) - torch.log10(pred_pos)
         diff_log_neg = torch.log10(target_neg) - torch.log10(pred_neg)
 
-        # Utilisation de la moyenne pour que la loss soit indépendante de la taille du tenseur
         loss_mag = 0.5 * torch.mean(diff_log_pos ** 2) + 0.5 * torch.mean(diff_log_neg ** 2)
 
-        # Loss d'unité (somme des poids = 1)
         loss_unity = torch.mean((torch.sum(weights, dim=1) - 1.0) ** 2)
 
         return loss_mag * (1 - self.unity_weight) + self.unity_weight * loss_unity
