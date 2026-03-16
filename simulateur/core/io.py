@@ -14,7 +14,20 @@ def prepare_output_dirs(root_dir):
     return h5_dir, img_dir
 
 
-def save_image(save_png_path, data):
+def save_image(save_png_path, data, style="figure"):
+    if style not in {"figure", "raw"}:
+        raise ValueError(f"Unknown image style: {style}")
+
+    if style == "raw":
+        plt.imsave(
+            save_png_path,
+            data["bmode_dB"],
+            cmap="gray",
+            vmin=-60,
+            vmax=0,
+        )
+        return
+
     plt.figure()
     plt.imshow(
         data["bmode_dB"],
