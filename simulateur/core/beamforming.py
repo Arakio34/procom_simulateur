@@ -154,13 +154,13 @@ def mvdr_beamforming(params, rf, nelem=None, snr_db=None, regularization=0.1):
 
             try:
                 num = np.linalg.solve(r_loaded, a)
-                den = np.real(a.conj().T @ num)
+                den = np.real(a.conj().T @ num).item()
                 w = num / den
             except np.linalg.LinAlgError:
                 bmode_mvdr[iz, ix] = 0.0
                 continue
 
-            pixel_val = w.conj().T @ x_vec
+            pixel_val = (w.conj().T @ x_vec).item()
             rf_mvdr[iz, ix] = np.real(pixel_val)
             bmode_mvdr[iz, ix] = np.abs(pixel_val)
 
