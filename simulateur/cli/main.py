@@ -46,6 +46,12 @@ def _build_parser():
     sim.add_argument("--seed", type=int, default=0, help="Base seed")
     sim.add_argument("--mvdr", action="store_true", help="Enable MVDR")
     sim.add_argument(
+        "--png-style",
+        choices=["figure", "raw"],
+        default="figure",
+        help="PNG output style: 'figure' with axes/colorbar, or 'raw' image only.",
+    )
+    sim.add_argument(
         "--max-point",
         type=int,
         default=3,
@@ -164,7 +170,7 @@ def _run_simulation(args):
         h5_path = os.path.join(h5_dir, f"{filename_base}.h5")
         png_path = os.path.join(img_dir, f"{filename_base}.png")
         save_h5(h5_path, data)
-        save_image(png_path, data)
+        save_image(png_path, data, style=args.png_style)
         outputs.append(
             {
                 "h5": h5_path,
