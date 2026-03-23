@@ -1,6 +1,14 @@
 # Simulateur echographique (CLI)
 
 Ce depot expose un simulateur B-mode avec une CLI legere. Le coeur est dans `core/`, la CLI dans `cli/`, et `main.py` sert de point d'entree.
+## Installation et initialisation
+
+### Avec uv (recommandé)
+
+Ce projet utilise **uv** pour la gestion des dépendances.
+
+# Installer les dépendances et créer automatiquement l'environnement virtuel
+uv sync
 
 ## Prerequis
 - Python 3
